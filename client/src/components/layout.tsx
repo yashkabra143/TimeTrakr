@@ -1,10 +1,10 @@
 import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Zap, 
-  Calendar, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Zap,
+  Calendar,
+  Settings,
   Menu,
   X
 } from "lucide-react";
@@ -32,19 +32,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-xl font-bold font-heading tracking-tight">TimeFlow</h1>
       </div>
-      
+
       <nav className="flex-1 p-4 space-y-2">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href;
-          
+
           return (
             <Link key={item.href} href={item.href}>
               <div
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 cursor-pointer group",
-                  isActive 
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" 
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-muted-foreground"
                 )}
                 onClick={() => setIsMobileOpen(false)}
@@ -59,8 +59,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="bg-secondary/50 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground mb-1">Current Plan</p>
-          <p className="text-sm font-medium">Pro Workspace</p>
+          <p className="text-xs text-muted-foreground mb-1">Upwork Tracker</p>
+          <p className="text-sm font-medium">Yash Kabra</p>
         </div>
       </div>
     </div>

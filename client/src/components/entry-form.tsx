@@ -83,7 +83,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
         date: new Date(),
         description: "",
       });
-      
+
       onSuccess?.();
     } catch (error) {
       toast({
@@ -186,7 +186,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="description"
@@ -204,7 +204,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
           <div className="bg-muted/30 rounded-xl p-6 space-y-4 border border-border/50 flex flex-col justify-center">
             <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider mb-2">Estimated Earnings</h3>
-            
+
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Gross Amount</p>
               <p className="text-2xl font-bold font-heading" data-testid="text-gross">${calculated.gross.toFixed(2)}</p>

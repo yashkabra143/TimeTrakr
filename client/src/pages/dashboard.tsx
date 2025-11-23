@@ -1,16 +1,16 @@
 import { StatsCard } from "@/components/ui/stats-card";
-import { 
-  Clock, 
-  DollarSign, 
-  Wallet, 
+import {
+  Clock,
+  DollarSign,
+  Wallet,
   PieChart as PieChartIcon,
 } from "lucide-react";
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -43,7 +43,7 @@ export default function Dashboard() {
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-  
+
   const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
   const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
 
@@ -54,9 +54,10 @@ export default function Dashboard() {
     return filteredEntries.reduce((acc, curr) => ({
       hours: acc.hours + (curr.hours || 0),
       grossUsd: acc.grossUsd + (curr.grossUsd || 0),
+      netUsd: acc.netUsd + (curr.netUsd || 0),
       netInr: acc.netInr + (curr.netInr || 0),
       deductions: acc.deductions + (curr.deductionTotal || 0)
-    }), { hours: 0, grossUsd: 0, netInr: 0, deductions: 0 });
+    }), { hours: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 });
   };
 
   const weekSummary = calculateSummary(getEntriesInDateRange(weekStart, weekEnd));
@@ -103,7 +104,7 @@ export default function Dashboard() {
                 </DialogDescription>
               </DialogHeader>
               <EntryForm onSuccess={() => {
-                document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
+                document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
               }} />
             </DialogContent>
           </Dialog>
@@ -117,7 +118,7 @@ export default function Dashboard() {
           <TabsTrigger value="month">This Month</TabsTrigger>
           <TabsTrigger value="all">All Time</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="week" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard
@@ -132,6 +133,13 @@ export default function Dashboard() {
               value={`$${(weekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
+            />
+            <StatsCard
+              title="Net Income (USD)"
+              value={`$${(weekSummary.netUsd || 0).toFixed(2)}`}
+              subValue="After deductions"
+              icon={DollarSign}
+              className="text-primary"
             />
             <StatsCard
               title="Net Income (INR)"
@@ -164,6 +172,13 @@ export default function Dashboard() {
               icon={DollarSign}
             />
             <StatsCard
+              title="Net Income (USD)"
+              value={`$${(lastWeekSummary.netUsd || 0).toFixed(2)}`}
+              subValue="After deductions"
+              icon={DollarSign}
+              className="text-primary"
+            />
+            <StatsCard
               title="Net Income (INR)"
               value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
               subValue={`@ ₹${currency?.usdToInr || 0}/$`}
@@ -177,20 +192,22 @@ export default function Dashboard() {
             />
           </div>
         </TabsContent>
-        
+
         <TabsContent value="month" className="space-y-4">
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
             <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
+            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
             <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
             <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
           </div>
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
             <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
+            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
             <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
             <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
           </div>
@@ -222,7 +239,7 @@ export default function Dashboard() {
                   axisLine={false}
                   tickFormatter={(value) => `${value}h`}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                 />
                 <Line
@@ -237,7 +254,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        
+
         <Card className="col-span-3 border-none shadow-sm">
           <CardHeader>
             <CardTitle>Project Distribution</CardTitle>
@@ -246,7 +263,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-             <ResponsiveContainer width="100%" height={350}>
+            <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
                   data={projectPieData}

@@ -7,10 +7,26 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Download, Upload, Trash2 } from "lucide-react";
+import { Save, Download, Upload, Trash2, Plus, RefreshCw } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries } from "@/lib/hooks";
-import { useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject } from "@/lib/hooks";
+import { useEffect, useState } from "react";
+
+// Predefined color palette for projects
+const PROJECT_COLORS = [
+  "#3b82f6", // blue
+  "#8b5cf6", // purple
+  "#ec4899", // pink
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#14b8a6", // teal
+  "#6366f1", // indigo
+  "#a855f7", // violet
+];
 
 const projectSchema = z.object({
   projects: z.array(z.object({
@@ -20,6 +36,12 @@ const projectSchema = z.object({
     color: z.string(),
     createdAt: z.any().optional(),
   })),
+});
+
+const newProjectSchema = z.object({
+  name: z.string().min(1, "Project name is required"),
+  rate: z.coerce.number().min(0, "Rate must be 0 or greater"),
+  color: z.string(),
 });
 
 const deductionSchema = z.object({
@@ -38,11 +60,28 @@ export default function Settings() {
   const { data: deductions } = useDeductions();
   const { data: currency } = useCurrencySettings();
   const { data: entries = [] } = useTimeEntries();
-  
+
   const updateProject = useUpdateProject();
+  const createProject = useCreateProject();
+  const deleteProject = useDeleteProject();
   const updateDeductions = useUpdateDeductions();
   const updateCurrency = useUpdateCurrencySettings();
   const { toast } = useToast();
+
+  // State for dialogs
+  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+
+  // New Project Form
+  const newProjectForm = useForm({
+    resolver: zodResolver(newProjectSchema),
+    defaultValues: {
+      name: "",
+      rate: 0,
+      color: PROJECT_COLORS[0],
+    },
+  });
 
   // Project Form
   const projectForm = useForm({
@@ -92,6 +131,33 @@ export default function Settings() {
     toast({ title: "Projects Updated", description: "Your project settings have been saved." });
   }
 
+  async function onNewProjectSubmit(data: z.infer<typeof newProjectSchema>) {
+    try {
+      await createProject.mutateAsync(data);
+      newProjectForm.reset({
+        name: "",
+        rate: 0,
+        color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)],
+      });
+      setIsAddProjectOpen(false);
+      toast({ title: "Project Created", description: `${data.name} has been added successfully.` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create project. Please try again.", variant: "destructive" });
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (!deleteProjectId) return;
+
+    try {
+      await deleteProject.mutateAsync(deleteProjectId);
+      setDeleteProjectId(null);
+      toast({ title: "Project Deleted", description: "Project and associated entries have been removed." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete project. Please try again.", variant: "destructive" });
+    }
+  }
+
   async function onDeductionSubmit(data: z.infer<typeof deductionSchema>) {
     await updateDeductions.mutateAsync(data);
     toast({ title: "Deductions Updated", description: "Tax and fee settings saved." });
@@ -100,6 +166,34 @@ export default function Settings() {
   async function onCurrencySubmit(data: z.infer<typeof currencySchema>) {
     await updateCurrency.mutateAsync({ usdToInr: data.usdToInr });
     toast({ title: "Currency Updated", description: `Exchange rate set to ₹${data.usdToInr}` });
+  }
+
+  async function fetchLiveExchangeRate() {
+    setIsFetchingRate(true);
+    try {
+      const response = await fetch('https://api.frankfurter.dev/latest?from=USD&to=INR');
+      if (!response.ok) throw new Error('Failed to fetch exchange rate');
+
+      const data = await response.json();
+      const rate = data.rates.INR;
+
+      // Update form and save to database
+      await updateCurrency.mutateAsync({ usdToInr: rate });
+      currencyForm.setValue('usdToInr', rate);
+
+      toast({
+        title: "Exchange Rate Updated",
+        description: `Live rate fetched: ₹${rate.toFixed(2)} per USD`
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch live rate. Please enter manually.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFetchingRate(false);
+    }
   }
 
   const handleExport = () => {
@@ -129,55 +223,154 @@ export default function Settings() {
         <TabsContent value="general" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Project Configuration</CardTitle>
-              <CardDescription>Set names and hourly rates for your 3 main projects.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...projectForm}>
-                <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-4">
-                  {projectForm.watch("projects").map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border rounded-lg bg-muted/20">
-                      <div className="col-span-1 md:col-span-1 flex justify-center pb-3">
-                         <div className="w-6 h-6 rounded-full" style={{ backgroundColor: field.color }} />
-                      </div>
-                      <div className="col-span-11 md:col-span-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Project Configuration</CardTitle>
+                  <CardDescription>Manage your freelance projects and hourly rates.</CardDescription>
+                </div>
+                <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Project</DialogTitle>
+                      <DialogDescription>
+                        Create a new project with a custom rate and color.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...newProjectForm}>
+                      <form onSubmit={newProjectForm.handleSubmit(onNewProjectSubmit)} className="space-y-4">
                         <FormField
-                          control={projectForm.control}
-                          name={`projects.${index}.name`}
+                          control={newProjectForm.control}
+                          name="name"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Project Name</FormLabel>
                               <FormControl>
-                                <Input {...field} data-testid={`input-project-name-${index}`} />
+                                <Input placeholder="Client name or project" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
-                      <div className="col-span-12 md:col-span-3">
                         <FormField
-                          control={projectForm.control}
-                          name={`projects.${index}.rate`}
+                          control={newProjectForm.control}
+                          name="rate"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Hourly Rate ($)</FormLabel>
                               <FormControl>
-                                <Input type="number" {...field} data-testid={`input-project-rate-${index}`} />
+                                <Input type="number" step="0.01" placeholder="25.00" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
+                        <FormField
+                          control={newProjectForm.control}
+                          name="color"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Project Color</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2 flex-wrap">
+                                  {PROJECT_COLORS.map((color) => (
+                                    <button
+                                      key={color}
+                                      type="button"
+                                      onClick={() => field.onChange(color)}
+                                      className={`w-8 h-8 rounded-full border-2 transition-all ${field.value === color ? 'border-primary scale-110' : 'border-transparent'
+                                        }`}
+                                      style={{ backgroundColor: color }}
+                                    />
+                                  ))}
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => setIsAddProjectOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit">Create Project</Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Form {...projectForm}>
+                <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-4">
+                  {projects.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>No projects yet. Click "Add Project" to get started.</p>
                     </div>
-                  ))}
-                  <div className="flex justify-end">
-                    <Button type="submit" data-testid="button-save-projects">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Projects
-                    </Button>
-                  </div>
+                  ) : (
+                    projectForm.watch("projects").map((field, index) => (
+                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border rounded-lg bg-muted/20">
+                        <div className="col-span-1 md:col-span-1 flex justify-center pb-3">
+                          <div className="w-6 h-6 rounded-full" style={{ backgroundColor: field.color }} />
+                        </div>
+                        <div className="col-span-11 md:col-span-5">
+                          <FormField
+                            control={projectForm.control}
+                            name={`projects.${index}.name`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Project Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid={`input-project-name-${index}`} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="col-span-12 md:col-span-3">
+                          <FormField
+                            control={projectForm.control}
+                            name={`projects.${index}.rate`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hourly Rate ($)</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="col-span-12 md:col-span-2 flex justify-end pb-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setDeleteProjectId(field.id)}
+                            data-testid={`button-delete-project-${index}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {projects.length > 0 && (
+                    <div className="flex justify-end">
+                      <Button type="submit" data-testid="button-save-projects">
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Projects
+                      </Button>
+                    </div>
+                  )}
                 </form>
               </Form>
             </CardContent>
@@ -236,7 +429,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                     <FormField
+                    <FormField
                       control={deductionForm.control}
                       name="transferFee"
                       render={({ field }) => (
@@ -271,7 +464,7 @@ export default function Settings() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">1 USD = {currency?.usdToInr || 0} INR</p>
                     </div>
-                    
+
                     <FormField
                       control={currencyForm.control}
                       name="usdToInr"
@@ -280,8 +473,8 @@ export default function Settings() {
                           <FormLabel>Manual Exchange Rate</FormLabel>
                           <FormControl>
                             <div className="relative">
-                               <span className="absolute left-3 top-2.5 text-muted-foreground">₹</span>
-                               <Input type="number" step="0.01" className="pl-8" {...field} data-testid="input-exchange-rate" />
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">₹</span>
+                              <Input type="number" step="0.01" className="pl-8" {...field} data-testid="input-exchange-rate" />
                             </div>
                           </FormControl>
                           <FormDescription>
@@ -291,7 +484,26 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" variant="secondary" data-testid="button-save-currency">Update Rate</Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={fetchLiveExchangeRate}
+                        disabled={isFetchingRate}
+                        className="flex-1"
+                        data-testid="button-fetch-rate"
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingRate ? 'animate-spin' : ''}`} />
+                        {isFetchingRate ? 'Fetching...' : 'Fetch Live Rate'}
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="secondary"
+                        className="flex-1"
+                        data-testid="button-save-currency"
+                      >
+                        Update Rate
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               </CardContent>
@@ -301,21 +513,39 @@ export default function Settings() {
 
         <TabsContent value="data" className="space-y-6">
           <Card>
-             <CardHeader>
-                <CardTitle>Backup & Restore</CardTitle>
-                <CardDescription>Export your data to JSON.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button onClick={handleExport} className="flex-1" data-testid="button-export">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Data
-                  </Button>
-                </div>
-              </CardContent>
+            <CardHeader>
+              <CardTitle>Backup & Restore</CardTitle>
+              <CardDescription>Export your data to JSON.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button onClick={handleExport} className="flex-1" data-testid="button-export">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Data
+                </Button>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Project Confirmation Dialog */}
+      <AlertDialog open={deleteProjectId !== null} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this project and all associated time entries. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export const timeEntries = pgTable("time_entries", {
   hours: real("hours").notNull(),
   date: timestamp("date").notNull(),
   description: text("description"),
-  
+
   // Snapshotted calculations
   grossUsd: real("gross_usd").notNull(),
   deductionService: real("deduction_service").notNull(),
@@ -43,7 +43,7 @@ export const timeEntries = pgTable("time_entries", {
   netUsd: real("net_usd").notNull(),
   netInr: real("net_inr").notNull(),
   exchangeRate: real("exchange_rate").notNull(),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -75,6 +75,10 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   netInr: true,
   exchangeRate: true,
   createdAt: true,
+}).extend({
+  date: z.coerce.date({
+    required_error: "Date is required",
+  }),
 });
 
 // Select schemas (TypeScript types)
