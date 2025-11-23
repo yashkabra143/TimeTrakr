@@ -4,26 +4,23 @@ import {
   Clock, 
   DollarSign, 
   Wallet, 
-  TrendingUp, 
-  Briefcase, 
-  PieChart as PieChartIcon 
+  PieChart as PieChartIcon,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 import { 
   LineChart, 
   Line, 
   XAxis, 
   YAxis, 
-  CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
   PieChart,
   Pie,
+  Cell,
   Legend
 } from "recharts";
-import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseISO, subDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseISO, subDays, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
@@ -36,6 +33,7 @@ export default function Dashboard() {
   // Helper to filter entries
   const getEntriesInDateRange = (startDate: Date, endDate: Date) => {
     return entries.filter(e => {
+      if (!e.date) return false;
       const entryDate = parseISO(e.date);
       return isWithinInterval(entryDate, { start: startDate, end: endDate });
     });
@@ -45,19 +43,24 @@ export default function Dashboard() {
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  
+  const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
+  const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
+
   const monthStart = startOfMonth(today);
 
-  // Calculate Summaries
+  // Calculate Summaries with NaN protection
   const calculateSummary = (filteredEntries: typeof entries) => {
     return filteredEntries.reduce((acc, curr) => ({
-      hours: acc.hours + curr.hours,
-      grossUsd: acc.grossUsd + curr.grossUsd,
-      netInr: acc.netInr + curr.netInr,
-      deductions: acc.deductions + curr.deductions.total
+      hours: acc.hours + (curr.hours || 0),
+      grossUsd: acc.grossUsd + (curr.grossUsd || 0),
+      netInr: acc.netInr + (curr.netInr || 0),
+      deductions: acc.deductions + (curr.deductions?.total || 0)
     }), { hours: 0, grossUsd: 0, netInr: 0, deductions: 0 });
   };
 
   const weekSummary = calculateSummary(getEntriesInDateRange(weekStart, weekEnd));
+  const lastWeekSummary = calculateSummary(getEntriesInDateRange(lastWeekStart, lastWeekEnd));
   const monthSummary = calculateSummary(getEntriesInDateRange(monthStart, today));
   const allTimeSummary = calculateSummary(entries);
 
@@ -66,15 +69,15 @@ export default function Dashboard() {
   const lineChartData = Array.from({ length: 7 }).map((_, i) => {
     const date = subDays(today, 6 - i);
     const dateStr = format(date, 'EEE');
-    const dayEntries = entries.filter(e => format(parseISO(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
-    const hours = dayEntries.reduce((acc, e) => acc + e.hours, 0);
+    const dayEntries = entries.filter(e => e.date && format(parseISO(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+    const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
     return { name: dateStr, hours };
   });
 
   // Project Distribution
   const projectPieData = projects.map(p => ({
     name: p.name,
-    value: entries.filter(e => e.projectId === p.id).reduce((acc, e) => acc + e.hours, 0),
+    value: entries.filter(e => e.projectId === p.id).reduce((acc, e) => acc + (e.hours || 0), 0),
     color: p.color
   })).filter(d => d.value > 0);
 
@@ -113,6 +116,7 @@ export default function Dashboard() {
       <Tabs defaultValue="week" className="space-y-4">
         <TabsList>
           <TabsTrigger value="week">This Week</TabsTrigger>
+          <TabsTrigger value="last_week">Last Week</TabsTrigger>
           <TabsTrigger value="month">This Month</TabsTrigger>
           <TabsTrigger value="all">All Time</TabsTrigger>
         </TabsList>
@@ -121,14 +125,14 @@ export default function Dashboard() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard
               title="Total Hours"
-              value={weekSummary.hours.toFixed(2)}
+              value={(weekSummary.hours || 0).toFixed(2)}
               subValue="Hours logged this week"
               icon={Clock}
               className="bg-white dark:bg-card"
             />
             <StatsCard
               title="Gross Earnings"
-              value={`$${weekSummary.grossUsd.toFixed(2)}`}
+              value={`$${(weekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
               trend="up"
@@ -136,13 +140,13 @@ export default function Dashboard() {
             />
             <StatsCard
               title="Net Income (INR)"
-              value={`₹${weekSummary.netInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              value={`₹${(weekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
               subValue={`@ ₹${currency.usdToInr}/$`}
               icon={Wallet}
             />
             <StatsCard
               title="Total Deductions"
-              value={`$${weekSummary.deductions.toFixed(2)}`}
+              value={`$${(weekSummary.deductions || 0).toFixed(2)}`}
               subValue="Fees & Taxes"
               icon={PieChartIcon}
               trend="down"
@@ -150,22 +154,52 @@ export default function Dashboard() {
             />
           </div>
         </TabsContent>
+
+        <TabsContent value="last_week" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+              title="Total Hours"
+              value={(lastWeekSummary.hours || 0).toFixed(2)}
+              subValue="Hours logged last week"
+              icon={Clock}
+              className="bg-white dark:bg-card"
+            />
+            <StatsCard
+              title="Gross Earnings"
+              value={`$${(lastWeekSummary.grossUsd || 0).toFixed(2)}`}
+              subValue="Before deductions"
+              icon={DollarSign}
+            />
+            <StatsCard
+              title="Net Income (INR)"
+              value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              subValue={`@ ₹${currency.usdToInr}/$`}
+              icon={Wallet}
+            />
+            <StatsCard
+              title="Total Deductions"
+              value={`$${(lastWeekSummary.deductions || 0).toFixed(2)}`}
+              subValue="Fees & Taxes"
+              icon={PieChartIcon}
+            />
+          </div>
+        </TabsContent>
         
         <TabsContent value="month" className="space-y-4">
            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard title="Total Hours" value={monthSummary.hours.toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${monthSummary.grossUsd.toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (INR)" value={`₹${monthSummary.netInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${monthSummary.deductions.toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
+            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
+            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
+            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
           </div>
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard title="Total Hours" value={allTimeSummary.hours.toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${allTimeSummary.grossUsd.toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (INR)" value={`₹${allTimeSummary.netInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${allTimeSummary.deductions.toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
+            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
+            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
+            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
           </div>
         </TabsContent>
       </Tabs>
@@ -264,7 +298,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold">{entry.hours} hrs</p>
-                    <p className="text-sm text-muted-foreground">${entry.grossUsd.toFixed(2)} / ₹{entry.netInr.toFixed(0)}</p>
+                    <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
                   </div>
                 </div>
               )

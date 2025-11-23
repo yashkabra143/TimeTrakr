@@ -92,33 +92,43 @@ export const useStore = create<AppState>()(
           return;
         }
 
+        // Ensure hours and rate are valid numbers
+        const hours = Number(entryData.hours) || 0;
+        const rate = Number(project.rate) || 0;
+
         // 1. Gross Amount = Hours * Rate
-        const grossUsd = entryData.hours * project.rate;
+        const grossUsd = hours * rate;
         
         // 2. Service Fee = Gross * (Service Fee % / 100)
-        const serviceAmt = grossUsd * (state.deductions.serviceFee / 100);
+        const serviceFeePercent = Number(state.deductions.serviceFee) || 0;
+        const serviceAmt = grossUsd * (serviceFeePercent / 100);
         
         // 3. TDS = Gross * (TDS % / 100)
-        const tdsAmt = grossUsd * (state.deductions.tds / 100);
+        const tdsPercent = Number(state.deductions.tds) || 0;
+        const tdsAmt = grossUsd * (tdsPercent / 100);
 
         // 4. GST = Service Fee * (GST % / 100)
-        const gstAmt = serviceAmt * (state.deductions.gst / 100);
+        const gstPercent = Number(state.deductions.gst) || 0;
+        const gstAmt = serviceAmt * (gstPercent / 100);
         
         // 5. Net Before Transfer = Gross - Service - TDS - GST
         const netBeforeTransfer = grossUsd - serviceAmt - tdsAmt - gstAmt;
         
         // 6. Transfer Fee = Flat Amount
-        const transferAmt = state.deductions.transferFee;
+        const transferAmt = Number(state.deductions.transferFee) || 0;
         
-        // 7. Final Net USD
-        const netUsd = netBeforeTransfer - transferAmt;
+        // 7. Final Net USD (ensure not negative)
+        const netUsd = Math.max(0, netBeforeTransfer - transferAmt);
         
         const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferAmt;
-        const netInr = netUsd * state.currency.usdToInr;
+        
+        const exchangeRate = Number(state.currency.usdToInr) || 0;
+        const netInr = netUsd * exchangeRate;
 
         const newEntry: TimeEntry = {
           id: crypto.randomUUID(),
           ...entryData,
+          hours, // ensure number
           grossUsd,
           deductions: {
             service: serviceAmt,
@@ -129,7 +139,7 @@ export const useStore = create<AppState>()(
           },
           netUsd,
           netInr,
-          exchangeRate: state.currency.usdToInr
+          exchangeRate
         };
 
         set({ entries: [newEntry, ...state.entries] });
