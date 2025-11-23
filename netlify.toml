@@ -1,6 +1,8 @@
 [build]
   command = "npm run build"
   publish = "dist/public"
+  functions = "netlify/functions"
+
 
 [functions]
   external_node_modules = ["express", "serverless-http"]
@@ -8,7 +10,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/api/api/:splat"
   status = 200
 
 [[redirects]]
