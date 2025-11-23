@@ -1,0 +1,214 @@
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useStore } from "@/lib/store";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar as CalendarIcon, DollarSign, Calculator, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useEffect, useState } from "react";
+
+const formSchema = z.object({
+  projectId: z.string().min(1, "Please select a project"),
+  hours: z.coerce.number().min(0.1, "Hours must be at least 0.1"),
+  date: z.date({
+    required_error: "A date of entry is required.",
+  }),
+  description: z.string().optional(),
+});
+
+export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, className?: string }) {
+  const { projects, deductions, currency, addEntry } = useStore();
+  const { toast } = useToast();
+  const [calculated, setCalculated] = useState({ gross: 0, netUsd: 0, netInr: 0 });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      hours: 0,
+      date: new Date(),
+      description: "",
+    },
+  });
+
+  const watchedHours = form.watch("hours");
+  const watchedProjectId = form.watch("projectId");
+
+  useEffect(() => {
+    const project = projects.find(p => p.id === watchedProjectId);
+    if (project && watchedHours) {
+      const gross = watchedHours * project.rate;
+      const totalDeductionPercent = (deductions.upworkFee + deductions.serviceFee + deductions.gst + deductions.tds) / 100;
+      const netUsd = gross * (1 - totalDeductionPercent);
+      const netInr = netUsd * currency.usdToInr;
+      setCalculated({ gross, netUsd, netInr });
+    } else {
+      setCalculated({ gross: 0, netUsd: 0, netInr: 0 });
+    }
+  }, [watchedHours, watchedProjectId, projects, deductions, currency]);
+
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    addEntry({
+      projectId: values.projectId,
+      hours: values.hours,
+      date: values.date.toISOString(),
+      description: values.description,
+    });
+
+    toast({
+      title: "Entry Added",
+      description: `Logged ${values.hours} hours for ${projects.find(p => p.id === values.projectId)?.name}`,
+    });
+
+    form.reset({
+      projectId: values.projectId, // Keep last project selected
+      hours: 0,
+      date: new Date(),
+      description: "",
+    });
+    
+    onSuccess?.();
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className={cn("space-y-6", className)}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="projectId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a project" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
+                            {project.name} (${project.rate}/hr)
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="hours"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hours Worked</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input type="number" step="0.25" placeholder="0.00" className="pl-9" {...field} />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="What did you work on?" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="bg-muted/30 rounded-xl p-6 space-y-4 border border-border/50 flex flex-col justify-center">
+            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider mb-2">Estimated Earnings</h3>
+            
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Gross Amount</p>
+              <p className="text-2xl font-bold font-heading">${calculated.gross.toFixed(2)}</p>
+            </div>
+
+            <div className="space-y-1 pt-2 border-t border-border/50">
+              <p className="text-sm text-muted-foreground">Net USD (after {deductions.upworkFee + deductions.serviceFee + deductions.gst + deductions.tds}% deductions)</p>
+              <p className="text-2xl font-bold font-heading text-primary">${calculated.netUsd.toFixed(2)}</p>
+            </div>
+
+            <div className="space-y-1 pt-2 border-t border-border/50">
+              <p className="text-sm text-muted-foreground">Net INR (₹{currency.usdToInr}/$)</p>
+              <p className="text-2xl font-bold font-heading text-green-600">₹{calculated.netInr.toFixed(0)}</p>
+            </div>
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full h-12 text-base" size="lg">
+          Log Time Entry
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </form>
+    </Form>
+  );
+}
