@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, Calculator, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +12,7 @@ import { format } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useEffect, useState } from "react";
+import { useProjects, useDeductions, useCurrencySettings, useCreateTimeEntry } from "@/lib/hooks";
 
 const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
@@ -24,7 +24,10 @@ const formSchema = z.object({
 });
 
 export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, className?: string }) {
-  const { projects, deductions, currency, addEntry } = useStore();
+  const { data: projects = [] } = useProjects();
+  const { data: deductions } = useDeductions();
+  const { data: currency } = useCurrencySettings();
+  const createEntry = useCreateTimeEntry();
   const { toast } = useToast();
   const [calculated, setCalculated] = useState({ gross: 0, netUsd: 0, netInr: 0 });
 
@@ -42,57 +45,53 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
   useEffect(() => {
     const project = projects.find(p => p.id === watchedProjectId);
-    if (project && watchedHours) {
-      // 1. Gross Amount = Hours * Rate
+    if (project && watchedHours && deductions && currency) {
       const gross = watchedHours * project.rate;
-
-      // 2. Service Fee = Gross * (Service Fee % / 100)
-      const serviceAmt = gross * (deductions.serviceFee / 100);
-
-      // 3. TDS = Gross * (TDS % / 100)
-      const tdsAmt = gross * (deductions.tds / 100);
-
-      // 4. GST = Service Fee * (GST % / 100)
-      const gstAmt = serviceAmt * (deductions.gst / 100);
-
-      // 5. Net Before Transfer = Gross - Service - TDS - GST
+      const serviceFeePercent = deductions.serviceFee || 0;
+      const serviceAmt = gross * (serviceFeePercent / 100);
+      const tdsPercent = deductions.tds || 0;
+      const tdsAmt = gross * (tdsPercent / 100);
+      const gstPercent = deductions.gst || 0;
+      const gstAmt = serviceAmt * (gstPercent / 100);
+      const transferAmt = deductions.transferFee || 0;
       const netBeforeTransfer = gross - serviceAmt - tdsAmt - gstAmt;
-
-      // 6. Transfer Fee = Flat Amount
-      const transferAmt = deductions.transferFee;
-
-      // 7. Final Net USD
       const netUsd = Math.max(0, netBeforeTransfer - transferAmt);
-      
       const netInr = netUsd * currency.usdToInr;
-      
       setCalculated({ gross, netUsd, netInr });
     } else {
       setCalculated({ gross: 0, netUsd: 0, netInr: 0 });
     }
   }, [watchedHours, watchedProjectId, projects, deductions, currency]);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    addEntry({
-      projectId: values.projectId,
-      hours: values.hours,
-      date: values.date.toISOString(),
-      description: values.description,
-    });
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await createEntry.mutateAsync({
+        projectId: values.projectId,
+        hours: values.hours,
+        date: values.date,
+        description: values.description,
+      });
 
-    toast({
-      title: "Entry Added",
-      description: `Logged ${values.hours} hours for ${projects.find(p => p.id === values.projectId)?.name}`,
-    });
+      toast({
+        title: "Entry Added",
+        description: `Logged ${values.hours} hours for ${projects.find(p => p.id === values.projectId)?.name}`,
+      });
 
-    form.reset({
-      projectId: values.projectId, // Keep last project selected
-      hours: 0,
-      date: new Date(),
-      description: "",
-    });
-    
-    onSuccess?.();
+      form.reset({
+        projectId: values.projectId,
+        hours: 0,
+        date: new Date(),
+        description: "",
+      });
+      
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add entry. Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   return (
@@ -108,7 +107,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                   <FormLabel>Project</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger data-testid="select-project">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                     </FormControl>
@@ -137,7 +136,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                   <FormControl>
                     <div className="relative">
                       <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input type="number" step="0.25" placeholder="0.00" className="pl-9" {...field} />
+                      <Input data-testid="input-hours" type="number" step="0.25" placeholder="0.00" className="pl-9" {...field} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -156,6 +155,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                       <FormControl>
                         <Button
                           variant={"outline"}
+                          data-testid="button-date"
                           className={cn(
                             "w-full pl-3 text-left font-normal",
                             !field.value && "text-muted-foreground"
@@ -194,7 +194,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="What did you work on?" {...field} />
+                    <Input data-testid="input-description" placeholder="What did you work on?" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -207,23 +207,23 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
             
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Gross Amount</p>
-              <p className="text-2xl font-bold font-heading">${calculated.gross.toFixed(2)}</p>
+              <p className="text-2xl font-bold font-heading" data-testid="text-gross">${calculated.gross.toFixed(2)}</p>
             </div>
 
             <div className="space-y-1 pt-2 border-t border-border/50">
               <p className="text-sm text-muted-foreground">Net USD (after all deductions)</p>
-              <p className="text-2xl font-bold font-heading text-primary">${calculated.netUsd.toFixed(2)}</p>
+              <p className="text-2xl font-bold font-heading text-primary" data-testid="text-net-usd">${calculated.netUsd.toFixed(2)}</p>
             </div>
 
             <div className="space-y-1 pt-2 border-t border-border/50">
-              <p className="text-sm text-muted-foreground">Net INR (₹{currency.usdToInr}/$)</p>
-              <p className="text-2xl font-bold font-heading text-green-600">₹{calculated.netInr.toFixed(0)}</p>
+              <p className="text-sm text-muted-foreground">Net INR (₹{currency?.usdToInr || 0}/$)</p>
+              <p className="text-2xl font-bold font-heading text-green-600" data-testid="text-net-inr">₹{calculated.netInr.toFixed(0)}</p>
             </div>
           </div>
         </div>
 
-        <Button type="submit" className="w-full h-12 text-base" size="lg">
-          Log Time Entry
+        <Button type="submit" data-testid="button-submit" className="w-full h-12 text-base" size="lg" disabled={createEntry.isPending}>
+          {createEntry.isPending ? "Logging..." : "Log Time Entry"}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </form>

@@ -1,12 +1,9 @@
-import { useStore } from "@/lib/store";
 import { StatsCard } from "@/components/ui/stats-card";
 import { 
   Clock, 
   DollarSign, 
   Wallet, 
   PieChart as PieChartIcon,
-  ArrowUpRight,
-  ArrowDownRight
 } from "lucide-react";
 import { 
   LineChart, 
@@ -26,15 +23,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 
 export default function Dashboard() {
-  const { entries, projects, currency } = useStore();
+  const { data: entries = [] } = useTimeEntries();
+  const { data: projects = [] } = useProjects();
+  const { data: currency } = useCurrencySettings();
 
   // Helper to filter entries
   const getEntriesInDateRange = (startDate: Date, endDate: Date) => {
     return entries.filter(e => {
       if (!e.date) return false;
-      const entryDate = parseISO(e.date);
+      const entryDate = new Date(e.date);
       return isWithinInterval(entryDate, { start: startDate, end: endDate });
     });
   };
@@ -55,7 +55,7 @@ export default function Dashboard() {
       hours: acc.hours + (curr.hours || 0),
       grossUsd: acc.grossUsd + (curr.grossUsd || 0),
       netInr: acc.netInr + (curr.netInr || 0),
-      deductions: acc.deductions + (curr.deductions?.total || 0)
+      deductions: acc.deductions + (curr.deductionTotal || 0)
     }), { hours: 0, grossUsd: 0, netInr: 0, deductions: 0 });
   };
 
@@ -65,11 +65,10 @@ export default function Dashboard() {
   const allTimeSummary = calculateSummary(entries);
 
   // Chart Data Preparation
-  // Weekly Line Chart (Last 7 days)
   const lineChartData = Array.from({ length: 7 }).map((_, i) => {
     const date = subDays(today, 6 - i);
     const dateStr = format(date, 'EEE');
-    const dayEntries = entries.filter(e => e.date && format(parseISO(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+    const dayEntries = entries.filter(e => e.date && format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
     const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
     return { name: dateStr, hours };
   });
@@ -91,7 +90,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button size="lg" className="shadow-lg shadow-primary/20">
+              <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
                 <Clock className="mr-2 h-4 w-4" />
                 Log Hours
               </Button>
@@ -104,9 +103,7 @@ export default function Dashboard() {
                 </DialogDescription>
               </DialogHeader>
               <EntryForm onSuccess={() => {
-                // Close dialog logic handled by parent if controlled, but here purely uncontrolled for now
-                // In a real app we'd use state to control open
-                document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'})); // Hacky close for prototype
+                document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
               }} />
             </DialogContent>
           </Dialog>
@@ -135,13 +132,11 @@ export default function Dashboard() {
               value={`$${(weekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
-              trend="up"
-              trendValue="+12%"
             />
             <StatsCard
               title="Net Income (INR)"
               value={`₹${(weekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue={`@ ₹${currency.usdToInr}/$`}
+              subValue={`@ ₹${currency?.usdToInr || 0}/$`}
               icon={Wallet}
             />
             <StatsCard
@@ -149,8 +144,6 @@ export default function Dashboard() {
               value={`$${(weekSummary.deductions || 0).toFixed(2)}`}
               subValue="Fees & Taxes"
               icon={PieChartIcon}
-              trend="down"
-              trendValue="4.2%"
             />
           </div>
         </TabsContent>
@@ -173,7 +166,7 @@ export default function Dashboard() {
             <StatsCard
               title="Net Income (INR)"
               value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue={`@ ₹${currency.usdToInr}/$`}
+              subValue={`@ ₹${currency?.usdToInr || 0}/$`}
               icon={Wallet}
             />
             <StatsCard
@@ -288,12 +281,12 @@ export default function Dashboard() {
             {entries.slice(0, 10).map((entry) => {
               const project = projects.find(p => p.id === entry.projectId);
               return (
-                <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors" data-testid={`entry-${entry.id}`}>
                   <div className="flex items-center gap-4">
                     <div className="w-2 h-12 rounded-full" style={{ backgroundColor: project?.color || 'gray' }} />
                     <div>
                       <p className="font-medium">{project?.name || 'Unknown Project'}</p>
-                      <p className="text-sm text-muted-foreground">{format(parseISO(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+                      <p className="text-sm text-muted-foreground">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
                     </div>
                   </div>
                   <div className="text-right">

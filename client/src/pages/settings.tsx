@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save, Download, Upload, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries } from "@/lib/hooks";
+import { useEffect } from "react";
 
 const projectSchema = z.object({
   projects: z.array(z.object({
@@ -17,6 +18,7 @@ const projectSchema = z.object({
     name: z.string().min(1, "Name is required"),
     rate: z.coerce.number().min(0, "Rate must be positive"),
     color: z.string(),
+    createdAt: z.any().optional(),
   })),
 });
 
@@ -32,7 +34,14 @@ const currencySchema = z.object({
 });
 
 export default function Settings() {
-  const { projects, deductions, currency, updateProject, updateDeductions, updateCurrency, entries, resetData, importData } = useStore();
+  const { data: projects = [] } = useProjects();
+  const { data: deductions } = useDeductions();
+  const { data: currency } = useCurrencySettings();
+  const { data: entries = [] } = useTimeEntries();
+  
+  const updateProject = useUpdateProject();
+  const updateDeductions = useUpdateDeductions();
+  const updateCurrency = useUpdateCurrencySettings();
   const { toast } = useToast();
 
   // Project Form
@@ -41,35 +50,55 @@ export default function Settings() {
     defaultValues: { projects },
   });
 
+  useEffect(() => {
+    if (projects.length > 0) {
+      projectForm.reset({ projects });
+    }
+  }, [projects]);
+
   // Deduction Form
   const deductionForm = useForm({
     resolver: zodResolver(deductionSchema),
-    defaultValues: {
-      serviceFee: deductions.serviceFee,
-      tds: deductions.tds,
-      gst: deductions.gst,
-      transferFee: deductions.transferFee,
-    },
+    defaultValues: deductions,
   });
+
+  useEffect(() => {
+    if (deductions) {
+      deductionForm.reset({
+        serviceFee: deductions.serviceFee,
+        tds: deductions.tds,
+        gst: deductions.gst,
+        transferFee: deductions.transferFee,
+      });
+    }
+  }, [deductions]);
 
   // Currency Form
   const currencyForm = useForm({
     resolver: zodResolver(currencySchema),
-    defaultValues: { usdToInr: currency.usdToInr },
+    defaultValues: { usdToInr: currency?.usdToInr || 84 },
   });
 
-  function onProjectSubmit(data: z.infer<typeof projectSchema>) {
-    data.projects.forEach(p => updateProject(p.id, p));
+  useEffect(() => {
+    if (currency) {
+      currencyForm.reset({ usdToInr: currency.usdToInr });
+    }
+  }, [currency]);
+
+  async function onProjectSubmit(data: z.infer<typeof projectSchema>) {
+    for (const p of data.projects) {
+      await updateProject.mutateAsync({ id: p.id, data: { name: p.name, rate: p.rate, color: p.color } });
+    }
     toast({ title: "Projects Updated", description: "Your project settings have been saved." });
   }
 
-  function onDeductionSubmit(data: z.infer<typeof deductionSchema>) {
-    updateDeductions(data);
+  async function onDeductionSubmit(data: z.infer<typeof deductionSchema>) {
+    await updateDeductions.mutateAsync(data);
     toast({ title: "Deductions Updated", description: "Tax and fee settings saved." });
   }
 
-  function onCurrencySubmit(data: z.infer<typeof currencySchema>) {
-    updateCurrency(data.usdToInr);
+  async function onCurrencySubmit(data: z.infer<typeof currencySchema>) {
+    await updateCurrency.mutateAsync({ usdToInr: data.usdToInr });
     toast({ title: "Currency Updated", description: `Exchange rate set to ₹${data.usdToInr}` });
   }
 
@@ -81,26 +110,6 @@ export default function Settings() {
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-  };
-
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const fileReader = new FileReader();
-    if (event.target.files && event.target.files[0]) {
-      fileReader.readAsText(event.target.files[0], "UTF-8");
-      fileReader.onload = (e) => {
-        if(e.target?.result) {
-          try {
-            const parsedData = JSON.parse(e.target.result as string);
-            importData(parsedData);
-            toast({ title: "Import Successful", description: "Data has been restored." });
-            // Reload page to reflect changes simply
-            setTimeout(() => window.location.reload(), 1000);
-          } catch (error) {
-            toast({ title: "Import Failed", description: "Invalid JSON file.", variant: "destructive" });
-          }
-        }
-      };
-    }
   };
 
   return (
@@ -139,7 +148,7 @@ export default function Settings() {
                             <FormItem>
                               <FormLabel>Project Name</FormLabel>
                               <FormControl>
-                                <Input {...field} />
+                                <Input {...field} data-testid={`input-project-name-${index}`} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -154,7 +163,7 @@ export default function Settings() {
                             <FormItem>
                               <FormLabel>Hourly Rate ($)</FormLabel>
                               <FormControl>
-                                <Input type="number" {...field} />
+                                <Input type="number" {...field} data-testid={`input-project-rate-${index}`} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -164,7 +173,7 @@ export default function Settings() {
                     </div>
                   ))}
                   <div className="flex justify-end">
-                    <Button type="submit">
+                    <Button type="submit" data-testid="button-save-projects">
                       <Save className="w-4 h-4 mr-2" />
                       Save Projects
                     </Button>
@@ -192,7 +201,7 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>Service Fee (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.1" {...field} />
+                            <Input type="number" step="0.1" {...field} data-testid="input-service-fee" />
                           </FormControl>
                           <FormDescription>Platform/Service fee on gross amount.</FormDescription>
                           <FormMessage />
@@ -206,7 +215,7 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>TDS (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" {...field} />
+                            <Input type="number" step="0.01" {...field} data-testid="input-tds" />
                           </FormControl>
                           <FormDescription>Tax Deducted at Source on gross.</FormDescription>
                           <FormMessage />
@@ -220,7 +229,7 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>GST on Service Fee (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.1" {...field} />
+                            <Input type="number" step="0.1" {...field} data-testid="input-gst" />
                           </FormControl>
                           <FormDescription>GST charged on the service fee amount.</FormDescription>
                           <FormMessage />
@@ -234,14 +243,14 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>Transfer Fee ($)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" {...field} />
+                            <Input type="number" step="0.01" {...field} data-testid="input-transfer-fee" />
                           </FormControl>
                           <FormDescription>Flat fee deducted during transfer.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full">Save Deductions</Button>
+                    <Button type="submit" className="w-full" data-testid="button-save-deductions">Save Deductions</Button>
                   </form>
                 </Form>
               </CardContent>
@@ -258,9 +267,9 @@ export default function Settings() {
                     <div className="bg-primary/5 p-6 rounded-xl text-center">
                       <p className="text-sm text-muted-foreground mb-2">Current Rate</p>
                       <div className="text-4xl font-bold font-heading text-primary">
-                        ₹{currency.usdToInr}
+                        ₹{currency?.usdToInr || 0}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">1 USD = {currency.usdToInr} INR</p>
+                      <p className="text-xs text-muted-foreground mt-2">1 USD = {currency?.usdToInr || 0} INR</p>
                     </div>
                     
                     <FormField
@@ -272,7 +281,7 @@ export default function Settings() {
                           <FormControl>
                             <div className="relative">
                                <span className="absolute left-3 top-2.5 text-muted-foreground">₹</span>
-                               <Input type="number" step="0.01" className="pl-8" {...field} />
+                               <Input type="number" step="0.01" className="pl-8" {...field} data-testid="input-exchange-rate" />
                             </div>
                           </FormControl>
                           <FormDescription>
@@ -282,7 +291,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" variant="secondary">Update Rate</Button>
+                    <Button type="submit" className="w-full" variant="secondary" data-testid="button-save-currency">Update Rate</Button>
                   </form>
                 </Form>
               </CardContent>
@@ -294,40 +303,13 @@ export default function Settings() {
           <Card>
              <CardHeader>
                 <CardTitle>Backup & Restore</CardTitle>
-                <CardDescription>Export your data to JSON or import a backup.</CardDescription>
+                <CardDescription>Export your data to JSON.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button onClick={handleExport} className="flex-1">
+                  <Button onClick={handleExport} className="flex-1" data-testid="button-export">
                     <Download className="w-4 h-4 mr-2" />
                     Export Data
-                  </Button>
-                  <div className="flex-1 relative">
-                    <Button variant="outline" className="w-full cursor-pointer">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Import Data
-                    </Button>
-                    <Input 
-                      type="file" 
-                      accept=".json" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                      onChange={handleImport}
-                    />
-                  </div>
-                </div>
-                
-                <Separator className="my-4" />
-                
-                <div className="pt-4">
-                  <h4 className="text-sm font-medium text-destructive mb-2">Danger Zone</h4>
-                  <Button variant="destructive" onClick={() => {
-                    if(confirm("Are you sure you want to delete all data? This cannot be undone.")) {
-                      resetData();
-                      toast({ title: "Data Reset", description: "All entries have been deleted." });
-                    }
-                  }}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete All Data
                   </Button>
                 </div>
               </CardContent>

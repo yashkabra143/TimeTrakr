@@ -1,13 +1,15 @@
-import { useStore } from "@/lib/store";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, parseISO, isSameDay } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from "date-fns";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 
 export default function Weekly() {
-  const { entries, projects, currency } = useStore();
+  const { data: entries = [] } = useTimeEntries();
+  const { data: projects = [] } = useProjects();
+  const { data: currency } = useCurrencySettings();
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
@@ -22,13 +24,13 @@ export default function Weekly() {
   const getDayData = (projectId: string, date: Date) => {
     const dayEntries = entries.filter(e => 
       e.projectId === projectId && 
-      isSameDay(parseISO(e.date), date)
+      isSameDay(new Date(e.date), date)
     );
     
-    const hours = dayEntries.reduce((acc, e) => acc + e.hours, 0);
-    const gross = dayEntries.reduce((acc, e) => acc + e.grossUsd, 0);
-    const netUsd = dayEntries.reduce((acc, e) => acc + e.netUsd, 0);
-    const netInr = dayEntries.reduce((acc, e) => acc + e.netInr, 0);
+    const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+    const gross = dayEntries.reduce((acc, e) => acc + (e.grossUsd || 0), 0);
+    const netUsd = dayEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0);
+    const netInr = dayEntries.reduce((acc, e) => acc + (e.netInr || 0), 0);
 
     return { hours, gross, netUsd, netInr };
   };
@@ -37,15 +39,15 @@ export default function Weekly() {
   const getProjectWeeklyTotal = (projectId: string) => {
     const weeklyEntries = entries.filter(e => 
       e.projectId === projectId && 
-      parseISO(e.date) >= weekStart && 
-      parseISO(e.date) <= weekEnd
+      new Date(e.date) >= weekStart && 
+      new Date(e.date) <= weekEnd
     );
 
     return {
-      hours: weeklyEntries.reduce((acc, e) => acc + e.hours, 0),
-      gross: weeklyEntries.reduce((acc, e) => acc + e.grossUsd, 0),
-      netUsd: weeklyEntries.reduce((acc, e) => acc + e.netUsd, 0),
-      netInr: weeklyEntries.reduce((acc, e) => acc + e.netInr, 0),
+      hours: weeklyEntries.reduce((acc, e) => acc + (e.hours || 0), 0),
+      gross: weeklyEntries.reduce((acc, e) => acc + (e.grossUsd || 0), 0),
+      netUsd: weeklyEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0),
+      netInr: weeklyEntries.reduce((acc, e) => acc + (e.netInr || 0), 0),
     };
   };
 
@@ -58,18 +60,18 @@ export default function Weekly() {
         </div>
         
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevWeek}>
+          <Button variant="ghost" size="icon" onClick={prevWeek} data-testid="button-prev-week">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="px-4 font-medium min-w-[200px] text-center flex items-center justify-center gap-2">
             <CalendarIcon className="w-4 h-4 text-muted-foreground" />
             {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
           </div>
-          <Button variant="ghost" size="icon" onClick={nextWeek}>
+          <Button variant="ghost" size="icon" onClick={nextWeek} data-testid="button-next-week">
             <ChevronRight className="h-4 w-4" />
           </Button>
           <div className="w-px h-6 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={goToToday}>
+          <Button variant="ghost" size="sm" onClick={goToToday} data-testid="button-today">
             Today
           </Button>
         </div>
@@ -80,7 +82,7 @@ export default function Weekly() {
           const totals = getProjectWeeklyTotal(project.id);
           
           return (
-            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col">
+            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col" data-testid={`project-card-${project.id}`}>
               <div className="h-2 w-full" style={{ backgroundColor: project.color }} />
               <CardHeader className="pb-2">
                 <CardTitle className="flex justify-between items-center text-lg">
