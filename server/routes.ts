@@ -1,11 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { 
-  insertProjectSchema, 
-  insertDeductionSchema, 
-  insertCurrencySettingsSchema, 
-  insertTimeEntrySchema 
+import {
+  insertProjectSchema,
+  insertDeductionSchema,
+  insertCurrencySettingsSchema,
+  insertTimeEntrySchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -100,6 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entries = await storage.getTimeEntries();
       res.json(entries);
     } catch (error) {
+      console.error("Error fetching time entries:", error);
       res.status(500).json({ error: "Failed to fetch time entries" });
     }
   });
@@ -107,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/entries", async (req, res) => {
     try {
       const entryData = insertTimeEntrySchema.parse(req.body);
-      
+
       // Fetch current project to calculate
       const project = await storage.getProject(entryData.projectId);
       if (!project) {
