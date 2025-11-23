@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStore, Project } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, RefreshCw, Download, Upload, Trash2 } from "lucide-react";
+import { Save, Download, Upload, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const projectSchema = z.object({
@@ -21,10 +21,10 @@ const projectSchema = z.object({
 });
 
 const deductionSchema = z.object({
-  upworkFee: z.coerce.number().min(0).max(100),
+  serviceFee: z.coerce.number().min(0).max(100),
   tds: z.coerce.number().min(0).max(100),
   gst: z.coerce.number().min(0).max(100),
-  serviceFee: z.coerce.number().min(0).max(100),
+  transferFee: z.coerce.number().min(0),
 });
 
 const currencySchema = z.object({
@@ -44,7 +44,12 @@ export default function Settings() {
   // Deduction Form
   const deductionForm = useForm({
     resolver: zodResolver(deductionSchema),
-    defaultValues: deductions,
+    defaultValues: {
+      serviceFee: deductions.serviceFee,
+      tds: deductions.tds,
+      gst: deductions.gst,
+      transferFee: deductions.transferFee,
+    },
   });
 
   // Currency Form
@@ -175,21 +180,21 @@ export default function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Deductions & Taxes</CardTitle>
-                <CardDescription>Set percentages to calculate net income.</CardDescription>
+                <CardDescription>Set calculation logic for net income.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...deductionForm}>
                   <form onSubmit={deductionForm.handleSubmit(onDeductionSubmit)} className="space-y-4">
                     <FormField
                       control={deductionForm.control}
-                      name="upworkFee"
+                      name="serviceFee"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Upwork Fee (%)</FormLabel>
+                          <FormLabel>Service Fee (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" step="0.1" {...field} />
                           </FormControl>
-                          <FormDescription>Platform fee per transaction.</FormDescription>
+                          <FormDescription>Platform/Service fee on gross amount.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -201,9 +206,9 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>TDS (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" step="0.01" {...field} />
                           </FormControl>
-                          <FormDescription>Tax Deducted at Source.</FormDescription>
+                          <FormDescription>Tax Deducted at Source on gross.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -213,25 +218,25 @@ export default function Settings() {
                       name="gst"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>GST (%)</FormLabel>
+                          <FormLabel>GST on Service Fee (%)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" step="0.1" {...field} />
                           </FormControl>
-                          <FormDescription>Goods and Services Tax.</FormDescription>
+                          <FormDescription>GST charged on the service fee amount.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <FormField
+                     <FormField
                       control={deductionForm.control}
-                      name="serviceFee"
+                      name="transferFee"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Service Fee (%)</FormLabel>
+                          <FormLabel>Transfer Fee ($)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" step="0.01" {...field} />
                           </FormControl>
-                          <FormDescription>Other service charges.</FormDescription>
+                          <FormDescription>Flat fee deducted during transfer.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

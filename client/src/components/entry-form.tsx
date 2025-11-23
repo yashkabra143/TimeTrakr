@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, DollarSign, Calculator, ArrowRight } from "lucide-react";
+import { Calendar as CalendarIcon, Calculator, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -44,10 +43,29 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
   useEffect(() => {
     const project = projects.find(p => p.id === watchedProjectId);
     if (project && watchedHours) {
+      // 1. Gross Amount = Hours * Rate
       const gross = watchedHours * project.rate;
-      const totalDeductionPercent = (deductions.upworkFee + deductions.serviceFee + deductions.gst + deductions.tds) / 100;
-      const netUsd = gross * (1 - totalDeductionPercent);
+
+      // 2. Service Fee = Gross * (Service Fee % / 100)
+      const serviceAmt = gross * (deductions.serviceFee / 100);
+
+      // 3. TDS = Gross * (TDS % / 100)
+      const tdsAmt = gross * (deductions.tds / 100);
+
+      // 4. GST = Service Fee * (GST % / 100)
+      const gstAmt = serviceAmt * (deductions.gst / 100);
+
+      // 5. Net Before Transfer = Gross - Service - TDS - GST
+      const netBeforeTransfer = gross - serviceAmt - tdsAmt - gstAmt;
+
+      // 6. Transfer Fee = Flat Amount
+      const transferAmt = deductions.transferFee;
+
+      // 7. Final Net USD
+      const netUsd = Math.max(0, netBeforeTransfer - transferAmt);
+      
       const netInr = netUsd * currency.usdToInr;
+      
       setCalculated({ gross, netUsd, netInr });
     } else {
       setCalculated({ gross: 0, netUsd: 0, netInr: 0 });
@@ -193,7 +211,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
             </div>
 
             <div className="space-y-1 pt-2 border-t border-border/50">
-              <p className="text-sm text-muted-foreground">Net USD (after {deductions.upworkFee + deductions.serviceFee + deductions.gst + deductions.tds}% deductions)</p>
+              <p className="text-sm text-muted-foreground">Net USD (after all deductions)</p>
               <p className="text-2xl font-bold font-heading text-primary">${calculated.netUsd.toFixed(2)}</p>
             </div>
 

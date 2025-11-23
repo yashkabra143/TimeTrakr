@@ -9,10 +9,10 @@ export interface Project {
 }
 
 export interface Deductions {
-  upworkFee: number; // Percentage
-  tds: number; // Percentage
-  gst: number; // Percentage
-  serviceFee: number; // Percentage
+  serviceFee: number; // Percentage (e.g., 10%)
+  tds: number; // Percentage (e.g., 0.1% or 1%)
+  gst: number; // Percentage (e.g., 18% on Service Fee)
+  transferFee: number; // Flat amount in USD (e.g., 0.99)
 }
 
 export interface CurrencySettings {
@@ -30,10 +30,10 @@ export interface TimeEntry {
   // Snapshotted values at time of entry
   grossUsd: number;
   deductions: {
-    upwork: number;
     service: number;
     gst: number;
     tds: number;
+    transfer: number;
     total: number;
   };
   netUsd: number;
@@ -64,10 +64,10 @@ const DEFAULT_PROJECTS: Project[] = [
 ];
 
 const DEFAULT_DEDUCTIONS: Deductions = {
-  upworkFee: 10,
-  tds: 1,
-  gst: 0,
-  serviceFee: 0,
+  serviceFee: 10, // 10%
+  tds: 0.1, // 0.1%
+  gst: 18, // 18% of Service Fee
+  transferFee: 0.99, // Flat $0.99
 };
 
 const DEFAULT_CURRENCY: CurrencySettings = {
@@ -92,21 +92,28 @@ export const useStore = create<AppState>()(
           return;
         }
 
-        // Calculations
+        // 1. Gross Amount = Hours * Rate
         const grossUsd = entryData.hours * project.rate;
         
-        // Deductions (Percent of Gross)
-        const upworkAmt = grossUsd * (state.deductions.upworkFee / 100);
+        // 2. Service Fee = Gross * (Service Fee % / 100)
         const serviceAmt = grossUsd * (state.deductions.serviceFee / 100);
         
-        // Net USD before Tax
-        // Taxes (Usually on Net or Gross depending on local laws, assuming on Gross for simplicity or as requested "Deductions")
-        
-        const gstAmt = grossUsd * (state.deductions.gst / 100);
+        // 3. TDS = Gross * (TDS % / 100)
         const tdsAmt = grossUsd * (state.deductions.tds / 100);
+
+        // 4. GST = Service Fee * (GST % / 100)
+        const gstAmt = serviceAmt * (state.deductions.gst / 100);
         
-        const totalDeductions = upworkAmt + serviceAmt + gstAmt + tdsAmt;
-        const netUsd = grossUsd - totalDeductions;
+        // 5. Net Before Transfer = Gross - Service - TDS - GST
+        const netBeforeTransfer = grossUsd - serviceAmt - tdsAmt - gstAmt;
+        
+        // 6. Transfer Fee = Flat Amount
+        const transferAmt = state.deductions.transferFee;
+        
+        // 7. Final Net USD
+        const netUsd = netBeforeTransfer - transferAmt;
+        
+        const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferAmt;
         const netInr = netUsd * state.currency.usdToInr;
 
         const newEntry: TimeEntry = {
@@ -114,10 +121,10 @@ export const useStore = create<AppState>()(
           ...entryData,
           grossUsd,
           deductions: {
-            upwork: upworkAmt,
             service: serviceAmt,
             gst: gstAmt,
             tds: tdsAmt,
+            transfer: transferAmt,
             total: totalDeductions
           },
           netUsd,
