@@ -1,9 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
-import * as schema from "@shared/schema";
-
-neonConfig.webSocketConstructor = ws;
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from "../shared/schema.js";
 
 // Check for DATABASE_URL with better error message
 if (!process.env.DATABASE_URL) {
@@ -14,13 +11,13 @@ if (!process.env.DATABASE_URL) {
   throw error;
 }
 
-// Log database connection status (without exposing the URL)
+// Use Neon HTTP driver for serverless (Vercel-compatible)
+// This uses fetch() instead of WebSockets or connection pooling
+console.log("Database configured for serverless (Neon HTTP driver)");
 console.log("Database connection initialized:", process.env.DATABASE_URL ? "✓ URL is set" : "✗ URL is missing");
 
-export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  // Add connection pool settings for serverless
-  max: 1, // Limit connections in serverless environment
-});
+// Create HTTP client
+const sql = neon(process.env.DATABASE_URL);
 
-export const db = drizzle({ client: pool, schema });
+// Create drizzle instance with HTTP client
+export const db = drizzle(sql, { schema });

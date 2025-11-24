@@ -1,15 +1,31 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import {
   insertProjectSchema,
   insertDeductionSchema,
   insertCurrencySettingsSchema,
   insertTimeEntrySchema
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get("/api/health", async (_req, res) => {
+    try {
+      // Test database connection
+      await storage.getProjects();
+      res.json({ status: "ok", database: "connected" });
+    } catch (error) {
+      console.error("Health check failed:", error);
+      res.status(500).json({ 
+        status: "error", 
+        database: "disconnected",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Projects
   app.get("/api/projects", async (_req, res) => {
     try {
@@ -83,7 +99,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getCurrencySettings();
       res.json(settings);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch currency settings" });
+      console.error("Error fetching currency settings:", error);
+      res.status(500).json({ error: "Failed to fetch currency settings", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
