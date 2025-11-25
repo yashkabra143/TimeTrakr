@@ -2,11 +2,12 @@ import serverless from "serverless-http";
 import { app } from "../server/app.js";
 import { registerRoutes } from "../server/routes.js";
 
-// Initialize routes and wrap with serverless-http for Vercel
-let handler: ReturnType<typeof serverless> | null = null;
+let handler: any = null;
+let initialized = false;
 
 async function getHandler() {
-  if (!handler) {
+  if (!handler && !initialized) {
+    initialized = true;
     const startTime = Date.now();
     try {
       console.log("[INIT] Initializing serverless handler...");
@@ -15,12 +16,18 @@ async function getHandler() {
         NODE_ENV: process.env.NODE_ENV,
         DATABASE_URL_SET: !!process.env.DATABASE_URL
       });
-      
-      // Register all routes (this returns a Server, but we don't need it for serverless)
-      const server = await registerRoutes(app);
+
+      // Register routes with timeout protection
+      await Promise.race([
+        registerRoutes(app),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Route registration timeout')), 8000)
+        )
+      ]);
+
       console.log(`[INIT] Routes registered successfully in ${Date.now() - startTime}ms`);
-      
-      // Add error handling middleware (if not already added)
+
+      // Error handling middleware
       app.use((err: any, _req: any, res: any, _next: any) => {
         console.error("[ERROR] Unhandled error:", err);
         const status = err.status || err.statusCode || 500;
@@ -29,37 +36,34 @@ async function getHandler() {
           res.status(status).json({ error: message });
         }
       });
-      
-      // Wrap Express app with serverless-http
-      handler = serverless(app, {
-        binary: ['image/*', 'application/pdf'],
-      });
-      console.log(`[INIT] Serverless handler created successfully (total: ${Date.now() - startTime}ms)`);
+
+      handler = serverless(app);
+      console.log(`[INIT] Handler ready (total: ${Date.now() - startTime}ms)`);
     } catch (error) {
-      console.error("[INIT] Failed to initialize handler:", error);
-      console.error("[INIT] Error stack:", error instanceof Error ? error.stack : String(error));
+      console.error("[INIT] Initialization failed:", error);
+      initialized = false; // Allow retry
       throw error;
     }
   }
   return handler;
 }
 
-// Export the handler for Vercel
 export default async (req: any, res: any) => {
   try {
-    console.log(`[${req.method}] ${req.url}`);
+    console.log(`[REQUEST] ${req.method} ${req.url}`);
     const h = await getHandler();
-    const result = await h(req, res);
-    return result;
+    if (!h) {
+      throw new Error('Handler not initialized');
+    }
+    return await h(req, res);
   } catch (error) {
-    console.error("Handler error:", error);
-    console.error("Error stack:", error instanceof Error ? error.stack : String(error));
+    console.error("[HANDLER ERROR]:", error);
     if (!res.headersSent) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Internal Server Error",
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? error.message : String(error),
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
       });
     }
   }
 };
-
