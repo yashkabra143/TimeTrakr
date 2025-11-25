@@ -52,32 +52,33 @@ export default function Weekly() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+      <div className="flex flex-col gap-4 md:gap-0 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading">Weekly Tracking</h1>
-          <p className="text-muted-foreground">Detailed breakdown of your week.</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Weekly Tracking</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Detailed breakdown of your week.</p>
         </div>
-        
-        <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevWeek} data-testid="button-prev-week">
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-card p-2 rounded-lg border shadow-sm">
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={prevWeek} data-testid="button-prev-week">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="px-4 font-medium min-w-[200px] text-center flex items-center justify-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-            {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+          <div className="px-2 sm:px-4 font-medium text-center text-sm md:text-base flex items-center justify-center gap-2 whitespace-nowrap min-w-fit md:min-w-[200px]">
+            <CalendarIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <span className="hidden sm:inline">{format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}</span>
+            <span className="sm:hidden">{format(weekStart, "MMM d")} - {format(weekEnd, "d")}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={nextWeek} data-testid="button-next-week">
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={nextWeek} data-testid="button-next-week">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <div className="w-px h-6 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={goToToday} data-testid="button-today">
+          <div className="hidden sm:block w-px h-6 bg-border mx-1" />
+          <Button variant="ghost" size="sm" className="h-10" onClick={goToToday} data-testid="button-today">
             Today
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {projects.map(project => {
           const totals = getProjectWeeklyTotal(project.id);
           
