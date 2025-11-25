@@ -1,11 +1,11 @@
 {
     "version": 2,
-    "buildCommand": "npm run build",
+    "buildCommand": "npm run vercel-build",
     "outputDirectory": "dist/public",
     "functions": {
         "api/[...].ts": {
             "memory": 1024,
-            "maxDuration": 60
+            "maxDuration": 30
         }
     },
     "routes": [
