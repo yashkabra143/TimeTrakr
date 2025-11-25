@@ -33,6 +33,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const isProduction = process.env.NODE_ENV === "production";
   const isVercel = !!process.env.VERCEL;
 
+  console.log("[MIDDLEWARE] Registering session...");
+  /*
   app.use(session({
     store: new MemStore({
       checkPeriod: null as any, // Disable pruning to prevent event loop hang in serverless
@@ -49,8 +51,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sameSite: "lax", // Changed from "none" to "lax" for better compatibility
     },
   }));
+  */
+  console.log("[MIDDLEWARE] Session skipped.");
 
   // Configure passport
+  /*
   passport.use(new LocalStrategy(
     {
       usernameField: "username",
@@ -80,6 +85,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(passport.initialize());
   app.use(passport.session());
+  */
+  console.log("[MIDDLEWARE] Passport skipped.");
 
   // Middleware to check if user is authenticated
   const requireAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -145,6 +152,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
+  });
+
+  // Handle root path if prefix is stripped
+  app.get("/", (_req, res) => {
+    console.log("[ROUTE] Root handler hit");
+    res.json({ status: "ok", path: "/" });
   });
 
   // Simple ping endpoint to check if API is responsive (no DB)
