@@ -165,32 +165,34 @@ export default function Dashboard() {
               value={(lastWeekSummary.hours || 0).toFixed(2)}
               subValue="Hours logged last week"
               icon={Clock}
-              className="bg-white dark:bg-card"
             />
             <StatsCard
               title="Gross Earnings"
               value={`$${(lastWeekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
+              className="value-accent"
             />
             <StatsCard
               title="Net Income (USD)"
               value={`$${(lastWeekSummary.netUsd || 0).toFixed(2)}`}
               subValue="After deductions"
               icon={DollarSign}
-              className="text-primary"
+              className="value-success"
             />
             <StatsCard
               title="Net Income (INR)"
               value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
               subValue={`@ ₹${currency?.usdToInr || 0}/$`}
               icon={Wallet}
+              className="value-success"
             />
             <StatsCard
               title="Total Deductions"
               value={`$${(lastWeekSummary.deductions || 0).toFixed(2)}`}
               subValue="Fees & Taxes"
               icon={PieChartIcon}
+              className="value-warning"
             />
           </div>
         </TabsContent>
