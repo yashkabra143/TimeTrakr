@@ -6,11 +6,13 @@ import {
   Calendar,
   Settings,
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/use-auth";
 import logoUrl from "@assets/generated_images/minimalist_abstract_hourglass_logo.png";
 
 const NAV_ITEMS = [
