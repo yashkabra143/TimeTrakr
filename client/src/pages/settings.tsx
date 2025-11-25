@@ -207,17 +207,17 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-12">
+    <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto pb-12 px-4 md:px-0">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading">Settings</h1>
-        <p className="text-muted-foreground">Manage your preferences, rates, and data.</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Manage your preferences, rates, and data.</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general">General & Projects</TabsTrigger>
-          <TabsTrigger value="financials">Financials</TabsTrigger>
-          <TabsTrigger value="data">Data Management</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="general" className="text-xs md:text-sm">General & Projects</TabsTrigger>
+          <TabsTrigger value="financials" className="text-xs md:text-sm">Financials</TabsTrigger>
+          <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
