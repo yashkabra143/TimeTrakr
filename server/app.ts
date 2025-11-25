@@ -16,6 +16,9 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// Trust proxy - important for Vercel deployment
+app.set("trust proxy", 1);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown

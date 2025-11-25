@@ -12,7 +12,6 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import MemoryStore from "memorystore";
-import type { Request as PassportRequest } from "passport";
 
 // Simple in-memory user storage for authentication
 const users = new Map<string, { id: string; username: string; password: string }>();
@@ -31,17 +30,23 @@ const MemStore = MemoryStore(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure session
+  const isProduction = process.env.NODE_ENV === "production";
+  const isVercel = !!process.env.VERCEL;
+
   app.use(session({
     store: new MemStore({
       checkPeriod: 86400000,
     }),
-    secret: "time-tracker-secret-key",
+    secret: process.env.SESSION_SECRET || "time-tracker-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      // On Vercel, cookies are handled by the proxy so we don't set secure
+      // For other production environments, use secure cookies
+      secure: isProduction && !isVercel,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: "lax", // Changed from "none" to "lax" for better compatibility
     },
   }));
 
@@ -86,14 +91,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Authentication routes
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.json({
-      success: true,
-      user: {
-        id: (req.user as any)?.id,
-        username: (req.user as any)?.username,
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({
+          error: "Internal server error",
+          message: err.message
+        });
       }
-    });
+
+      if (!user) {
+        return res.status(401).json({
+          error: "Authentication failed",
+          message: info?.message || "Invalid username or password"
+        });
+      }
+
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({
+            error: "Login failed",
+            message: err.message
+          });
+        }
+
+        return res.json({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+          }
+        });
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res) => {
@@ -125,8 +155,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ status: "ok", database: "connected" });
     } catch (error) {
       console.error("Health check failed:", error);
-      res.status(500).json({ 
-        status: "error", 
+      res.status(500).json({
+        status: "error",
         database: "disconnected",
         error: error instanceof Error ? error.message : String(error)
       });
