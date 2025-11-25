@@ -35,7 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(session({
     store: new MemStore({
-      checkPeriod: 86400000,
+      checkPeriod: null as any, // Disable pruning to prevent event loop hang in serverless
     }),
     secret: process.env.SESSION_SECRET || "time-tracker-secret-key-change-in-production",
     resave: false,
@@ -339,6 +339,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Failed to delete time entry" });
     }
+  });
+
+  // Catch-all for debugging
+  app.use("*", (req, res) => {
+    console.log(`[404] Unhandled path: ${req.path}`);
+    res.status(404).json({ error: "Not Found", path: req.path });
   });
 
   const httpServer = createServer(app);
