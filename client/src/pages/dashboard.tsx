@@ -200,20 +200,20 @@ export default function Dashboard() {
         <TabsContent value="month" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
-            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
+            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
+            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
+            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
           </div>
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
-            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
+            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
+            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
+            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
           </div>
         </TabsContent>
       </Tabs>
