@@ -315,45 +315,46 @@ export default function Settings() {
                     </div>
                   ) : (
                     projectForm.watch("projects").map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border rounded-lg bg-muted/20">
-                        <div className="col-span-1 md:col-span-1 flex justify-center pb-3">
-                          <div className="w-6 h-6 rounded-full" style={{ backgroundColor: field.color }} />
+                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-end p-3 md:p-4 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors duration-150">
+                        <div className="flex items-center gap-3 md:col-span-1">
+                          <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: field.color }} />
                         </div>
-                        <div className="col-span-11 md:col-span-5">
+                        <div className="col-span-1 md:col-span-5">
                           <FormField
                             control={projectForm.control}
                             name={`projects.${index}.name`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Project Name</FormLabel>
+                                <FormLabel className="text-xs md:text-sm">Project Name</FormLabel>
                                 <FormControl>
-                                  <Input {...field} data-testid={`input-project-name-${index}`} />
+                                  <Input {...field} data-testid={`input-project-name-${index}`} className="text-sm" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                        <div className="col-span-12 md:col-span-3">
+                        <div className="col-span-1 md:col-span-3">
                           <FormField
                             control={projectForm.control}
                             name={`projects.${index}.rate`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Hourly Rate ($)</FormLabel>
+                                <FormLabel className="text-xs md:text-sm">Hourly Rate ($)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} />
+                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} className="text-sm" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                        <div className="col-span-12 md:col-span-2 flex justify-end pb-3">
+                        <div className="col-span-1 md:col-span-2 flex justify-end md:pb-0">
                           <Button
                             type="button"
                             variant="outline"
                             size="icon"
+                            className="h-10 w-10"
                             onClick={() => setDeleteProjectId(field.id)}
                             data-testid={`button-delete-project-${index}`}
                           >
