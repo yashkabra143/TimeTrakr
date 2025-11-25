@@ -308,7 +308,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm">
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader>
           <CardTitle>Recent Entries</CardTitle>
           <CardDescription>
@@ -317,27 +317,31 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {entries.slice(0, 10).map((entry) => {
-              const project = projects.find(p => p.id === entry.projectId);
-              return (
-                <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors" data-testid={`entry-${entry.id}`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-2 h-12 rounded-full" style={{ backgroundColor: project?.color || 'gray' }} />
-                    <div>
-                      <p className="font-medium">{project?.name || 'Unknown Project'}</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+            {entries.length > 0 ? (
+              entries.slice(0, 10).map((entry) => {
+                const project = projects.find(p => p.id === entry.projectId);
+                return (
+                  <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150" data-testid={`entry-${entry.id}`}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-2 h-12 rounded-full" style={{ backgroundColor: project?.color || 'gray' }} />
+                      <div>
+                        <p className="font-medium">{project?.name || 'Unknown Project'}</p>
+                        <p className="text-sm text-muted-foreground">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{entry.hours} hrs</p>
+                      <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold">{entry.hours} hrs</p>
-                    <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
-                  </div>
+                )
+              })
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">No time entries yet</p>
+                  <p className="text-xs">Start logging hours to track your productivity and earnings</p>
                 </div>
-              )
-            })}
-            {entries.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No entries found. Start tracking time!
               </div>
             )}
           </div>
