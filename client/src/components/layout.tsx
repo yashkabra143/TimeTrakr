@@ -28,9 +28,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
       <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
         <div className="w-8 h-8 rounded-lg overflow-hidden">
-          <img src={logoUrl} alt="TimeFlow Logo" className="w-full h-full object-cover" />
+          <img src={logoUrl} alt="Yash Upwork Tracker Logo" className="w-full h-full object-cover" />
         </div>
-        <h1 className="text-xl font-bold font-heading tracking-tight">TimeFlow</h1>
+        <div className="flex flex-col">
+          <h1 className="text-xs uppercase font-bold font-heading tracking-tight text-muted-foreground">Yash</h1>
+          <h1 className="text-sm font-bold font-heading tracking-tight">Upwork Tracker</h1>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
