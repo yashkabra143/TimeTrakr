@@ -83,17 +83,17 @@ export default function Weekly() {
           const totals = getProjectWeeklyTotal(project.id);
           
           return (
-            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col" data-testid={`project-card-${project.id}`}>
+            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-200" data-testid={`project-card-${project.id}`}>
               <div className="h-2 w-full" style={{ backgroundColor: project.color }} />
-              <CardHeader className="pb-2">
-                <CardTitle className="flex justify-between items-center text-lg">
-                  {project.name}
-                  <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full">
+              <CardHeader className="pb-2 p-4 md:p-6">
+                <CardTitle className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-base md:text-lg">
+                  <span>{project.name}</span>
+                  <span className="text-xs md:text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full w-fit">
                     ${project.rate}/hr
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-4">
+              <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6">
                 {/* Weekly Summary Card */}
                 <div className="bg-muted/30 rounded-lg p-4 space-y-2 border border-border/50">
                   <div className="flex justify-between items-baseline">
