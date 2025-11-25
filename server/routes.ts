@@ -297,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/entries/:id", async (req, res) => {
+  app.delete("/api/entries/:id", requireAuth, async (req, res) => {
     try {
       await storage.deleteTimeEntry(req.params.id);
       res.status(204).send();
