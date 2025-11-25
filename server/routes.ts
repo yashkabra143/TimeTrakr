@@ -159,7 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/projects/:id", async (req, res) => {
+  app.patch("/api/projects/:id", requireAuth, async (req, res) => {
     try {
       const updatedProject = await storage.updateProject(req.params.id, req.body);
       if (!updatedProject) {
@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/projects/:id", async (req, res) => {
+  app.delete("/api/projects/:id", requireAuth, async (req, res) => {
     try {
       await storage.deleteProject(req.params.id);
       res.status(204).send();
@@ -181,8 +181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Deductions
-  app.get("/api/deductions", async (_req, res) => {
+  // Deductions (protected)
+  app.get("/api/deductions", requireAuth, async (_req, res) => {
     try {
       const deductions = await storage.getDeductions();
       res.json(deductions);
@@ -191,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/deductions", async (req, res) => {
+  app.patch("/api/deductions", requireAuth, async (req, res) => {
     try {
       const updatedDeductions = await storage.updateDeductions(req.body);
       res.json(updatedDeductions);
@@ -200,8 +200,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Currency Settings
-  app.get("/api/currency", async (_req, res) => {
+  // Currency Settings (protected)
+  app.get("/api/currency", requireAuth, async (_req, res) => {
     try {
       const settings = await storage.getCurrencySettings();
       res.json(settings);
@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/currency", async (req, res) => {
+  app.patch("/api/currency", requireAuth, async (req, res) => {
     try {
       const updatedSettings = await storage.updateCurrencySettings(req.body);
       res.json(updatedSettings);
@@ -220,8 +220,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Time Entries
-  app.get("/api/entries", async (_req, res) => {
+  // Time Entries (protected)
+  app.get("/api/entries", requireAuth, async (_req, res) => {
     try {
       const entries = await storage.getTimeEntries();
       res.json(entries);
@@ -231,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/entries", async (req, res) => {
+  app.post("/api/entries", requireAuth, async (req, res) => {
     try {
       const entryData = insertTimeEntrySchema.parse(req.body);
 
