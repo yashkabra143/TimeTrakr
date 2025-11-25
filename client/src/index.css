@@ -151,3 +151,27 @@
     @apply font-heading font-semibold tracking-tight;
   }
 }
+
+@layer components {
+  .value-success {
+    & > div:last-child div:first-child {
+      @apply text-green-600 dark:text-green-400;
+    }
+  }
+
+  .value-accent {
+    & > div:last-child div:first-child {
+      @apply text-amber-600 dark:text-amber-400;
+    }
+  }
+
+  .value-warning {
+    & > div:last-child div:first-child {
+      @apply text-red-600 dark:text-red-400;
+    }
+  }
+
+  .stats-card-hover {
+    @apply hover:shadow-lg hover:scale-105 transition-all duration-200;
+  }
+}
