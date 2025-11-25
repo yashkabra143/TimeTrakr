@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,24 +9,34 @@ import Weekly from "@/pages/weekly";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthStore } from "@/stores/auth-store";
+import { useEffect } from "react";
 
-function Router() {
+// Protected route wrapper
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
   return (
     <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/quick-entry" component={QuickEntry} />
-        <Route path="/weekly" component={Weekly} />
-        <Route path="/settings" component={Settings} />
-        <Route component={NotFound} />
-      </Switch>
+      <Component />
     </Layout>
   );
 }
 
 function App() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const initialize = useAuthStore((state) => state.initialize);
+  const [location] = useLocation();
+
+  // Initialize auth state on mount
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   if (isLoading) {
     return (
@@ -41,14 +51,38 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!isAuthenticated ? (
-        <Login />
-      ) : (
-        <>
-          <Router />
-          <Toaster />
-        </>
-      )}
+      <Switch>
+        {/* Login route - redirect to dashboard if already authenticated */}
+        <Route path="/login">
+          {isAuthenticated ? <Redirect to="/" /> : <Login />}
+        </Route>
+
+        {/* Protected routes */}
+        <Route path="/">
+          <ProtectedRoute component={Dashboard} />
+        </Route>
+        <Route path="/quick-entry">
+          <ProtectedRoute component={QuickEntry} />
+        </Route>
+        <Route path="/weekly">
+          <ProtectedRoute component={Weekly} />
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute component={Settings} />
+        </Route>
+
+        {/* 404 route */}
+        <Route path="/:rest*">
+          {isAuthenticated ? (
+            <Layout>
+              <NotFound />
+            </Layout>
+          ) : (
+            <Redirect to="/login" />
+          )}
+        </Route>
+      </Switch>
+      <Toaster />
     </QueryClientProvider>
   );
 }

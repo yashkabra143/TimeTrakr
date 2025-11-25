@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/stores/auth-store";
 import { Lock, Mail } from "lucide-react";
 import logoUrl from "@assets/generated_images/minimalist_abstract_hourglass_logo.png";
 
@@ -13,6 +14,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const login = useAuthStore((state) => state.login);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -38,11 +40,17 @@ export default function Login() {
         return;
       }
 
+      const data = await response.json();
+
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
 
+      // Update global auth state
+      login(data.user);
+
+      // Navigate to dashboard - App.tsx will automatically show authenticated routes
       navigate("/");
     } catch (error) {
       toast({

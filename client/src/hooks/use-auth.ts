@@ -50,10 +50,22 @@ export function useAuth() {
     }
   };
 
+  const refreshAuth = async () => {
+    const user = await checkAuth();
+    if (user) {
+      setUser(user);
+      setIsAuthenticated(true);
+    } else {
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+  };
+
   return {
     user,
     isLoading,
     isAuthenticated,
     logout,
+    refreshAuth,
   };
 }
