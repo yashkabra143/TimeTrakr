@@ -120,21 +120,21 @@ export default function Weekly() {
                   {days.map(day => {
                     const data = getDayData(project.id, day);
                     const isToday = isSameDay(day, new Date());
-                    
+
                     return (
-                      <div 
-                        key={day.toISOString()} 
+                      <div
+                        key={day.toISOString()}
                         className={cn(
-                          "flex items-center justify-between p-2 rounded text-sm",
-                          data.hours > 0 ? "bg-primary/5" : "text-muted-foreground",
+                          "flex items-center justify-between p-2.5 md:p-3 rounded text-sm transition-colors duration-150",
+                          data.hours > 0 ? "bg-primary/5 hover:bg-primary/10" : "text-muted-foreground hover:bg-muted/50",
                           isToday && "ring-1 ring-primary ring-inset"
                         )}
                       >
-                        <span className={cn("w-8 font-medium", isToday && "text-primary")}>{format(day, "EEE")}</span>
-                        <span className="flex-1 text-center text-xs text-muted-foreground">
+                        <span className={cn("w-8 md:w-10 font-medium", isToday && "text-primary")}>{format(day, "EEE")}</span>
+                        <span className="flex-1 text-center text-xs md:text-sm text-muted-foreground">
                           {data.hours > 0 ? `$${data.gross.toFixed(0)}` : '-'}
                         </span>
-                        <span className={cn("font-medium", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
+                        <span className={cn("font-medium text-right", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
                           {data.hours > 0 ? `${data.hours}h` : '-'}
                         </span>
                       </div>
