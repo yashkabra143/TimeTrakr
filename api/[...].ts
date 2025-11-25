@@ -25,13 +25,8 @@ async function getHandler() {
         DATABASE_URL_SET: !!process.env.DATABASE_URL
       });
 
-      // Register routes with timeout protection
-      await Promise.race([
-        registerRoutes(app),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Route registration timeout')), 8000)
-        )
-      ]);
+      // Register routes (no timeout needed - should be fast in serverless)
+      await registerRoutes(app);
 
       console.log(`[INIT] Routes registered successfully in ${Date.now() - startTime}ms`);
 

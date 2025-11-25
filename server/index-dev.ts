@@ -13,7 +13,11 @@ import viteConfig from "../vite.config";
 
 const viteLogger = createLogger();
 
-export async function setupVite(app: Express, server: Server) {
+export async function setupVite(app: Express, server: Server | null) {
+  if (!server) {
+    throw new Error("Vite dev server requires an HTTP server instance");
+  }
+  
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

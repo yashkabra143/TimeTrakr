@@ -10,7 +10,7 @@ import express, { type Express, type Request } from "express";
 
 import runApp from "./app";
 
-export async function serveStatic(app: Express, server: Server) {
+export async function serveStatic(app: Express, server: Server | null) {
   const distPath = path.resolve(__dirname, "public");
 
   if (!fs.existsSync(distPath)) {

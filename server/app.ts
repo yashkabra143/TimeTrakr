@@ -31,20 +31,14 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  console.log(`[DEBUG] Request: ${req.method} ${req.path}`);
-  next();
-});
-
-
-// Removed custom logging middleware to prevent potential serverless issues
+// Debug logging middleware
 app.use((req, res, next) => {
   console.log(`[DEBUG] Request: ${req.method} ${req.path}`);
   next();
 });
 
 export default async function runApp(
-  setup: (app: Express, server: Server) => Promise<void>,
+  setup: (app: Express, server: Server | null) => Promise<void>,
 ) {
   const server = await registerRoutes(app);
 
@@ -52,23 +46,31 @@ export default async function runApp(
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Don't throw after sending response - just log the error
+    console.error("[APP ERROR]", err);
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // importantly run the final setup after setting up all the other routes so
   // the catch-all route doesn't interfere with the other routes
   await setup(app, server);
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "127.0.0.1",
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  // Only start listening if we have a server (not in serverless mode)
+  if (server) {
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Other ports are firewalled. Default to 5000 if not specified.
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    const port = parseInt(process.env.PORT || '5000', 10);
+    server.listen({
+      port,
+      host: "127.0.0.1",
+    }, () => {
+      log(`serving on port ${port}`);
+    });
+  } else {
+    log("Running in serverless mode - no server to start");
+  }
 }
