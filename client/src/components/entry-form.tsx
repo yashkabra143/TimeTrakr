@@ -96,8 +96,8 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className={cn("space-y-6", className)}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className={cn("space-y-4 md:space-y-6", className)}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="space-y-4">
             <FormField
               control={form.control}
