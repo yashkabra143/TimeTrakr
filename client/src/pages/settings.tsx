@@ -451,11 +451,11 @@ export default function Settings() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Currency Conversion</CardTitle>
-                <CardDescription>Set the USD to INR exchange rate.</CardDescription>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-lg md:text-xl">Currency Conversion</CardTitle>
+                <CardDescription className="text-xs md:text-sm mt-1">Set the USD to INR exchange rate.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <Form {...currencyForm}>
                   <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-6">
                     <div className="bg-primary/5 p-6 rounded-xl text-center">
