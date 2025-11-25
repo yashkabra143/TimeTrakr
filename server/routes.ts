@@ -111,6 +111,211 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
+  // Projects routes
+  app.get("/api/projects", async (req, res) => {
+    try {
+      const projects = await storage.getProjects();
+      res.json(projects);
+    } catch (error) {
+      console.error("[PROJECTS GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/projects", async (req, res) => {
+    try {
+      const validated = insertProjectSchema.parse(req.body);
+      const project = await storage.createProject(validated);
+      res.status(201).json(project);
+    } catch (error) {
+      console.error("[PROJECTS POST] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid project data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/projects/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validated = insertProjectSchema.partial().parse(req.body);
+      const project = await storage.updateProject(id, validated);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (error) {
+      console.error("[PROJECTS PATCH] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid project data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.delete("/api/projects/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProject(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[PROJECTS DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Deductions routes
+  app.get("/api/deductions", async (req, res) => {
+    try {
+      const deductions = await storage.getDeductions();
+      if (!deductions) {
+        return res.status(404).json({ message: "Deductions not found" });
+      }
+      res.json(deductions);
+    } catch (error) {
+      console.error("[DEDUCTIONS GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/deductions", async (req, res) => {
+    try {
+      const validated = insertDeductionSchema.partial().parse(req.body);
+      const deductions = await storage.updateDeductions(validated);
+      res.json(deductions);
+    } catch (error) {
+      console.error("[DEDUCTIONS PATCH] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid deductions data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // Currency settings routes
+  app.get("/api/currency", async (req, res) => {
+    try {
+      const currency = await storage.getCurrencySettings();
+      if (!currency) {
+        return res.status(404).json({ message: "Currency settings not found" });
+      }
+      res.json(currency);
+    } catch (error) {
+      console.error("[CURRENCY GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/currency", async (req, res) => {
+    try {
+      const validated = insertCurrencySettingsSchema.partial().parse(req.body);
+      const currency = await storage.updateCurrencySettings(validated);
+      res.json(currency);
+    } catch (error) {
+      console.error("[CURRENCY PATCH] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid currency data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // Time entries routes
+  app.get("/api/entries", async (req, res) => {
+    try {
+      const entries = await storage.getTimeEntries();
+      res.json(entries);
+    } catch (error) {
+      console.error("[ENTRIES GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/entries", async (req, res) => {
+    try {
+      const baseEntry = insertTimeEntrySchema.parse(req.body);
+      
+      // Get project to get the rate
+      const project = await storage.getProject(baseEntry.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Get deductions and currency settings
+      const [deductions, currency] = await Promise.all([
+        storage.getDeductions(),
+        storage.getCurrencySettings()
+      ]);
+
+      if (!deductions || !currency) {
+        return res.status(500).json({ message: "Deductions or currency settings not configured" });
+      }
+
+      // Calculate fields based on project rate and deductions
+      const hours = Number(baseEntry.hours);
+      const rate = Number(project.rate);
+      const grossUsd = hours * rate;
+
+      // Deductions - stored as percentages (e.g., 10 means 10%)
+      const serviceFeePercent = Number(deductions.serviceFee) || 0;
+      const tdsPercent = Number(deductions.tds) || 0;
+      const gstPercent = Number(deductions.gst) || 0;
+      const transferFee = Number(deductions.transferFee) || 0;
+
+      const deductionService = grossUsd * (serviceFeePercent / 100);
+      const deductionTds = grossUsd * (tdsPercent / 100);
+      const deductionGst = (grossUsd - deductionService - deductionTds) * (gstPercent / 100);
+      const deductionTransfer = transferFee;
+      const deductionTotal = deductionService + deductionTds + deductionGst + deductionTransfer;
+
+      // Net calculations
+      const netBeforeTransfer = grossUsd - deductionService - deductionTds - deductionGst;
+      const netUsd = Math.max(0, netBeforeTransfer - deductionTransfer);
+      
+      const exchangeRate = Number(currency.usdToInr) || 0;
+      const netInr = netUsd * exchangeRate;
+
+      const entry = {
+        ...baseEntry,
+        grossUsd,
+        deductionService,
+        deductionGst,
+        deductionTds,
+        deductionTransfer,
+        deductionTotal,
+        netUsd,
+        netInr,
+        exchangeRate,
+      };
+      
+      const created = await storage.createTimeEntry(entry);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("[ENTRIES POST] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid entry data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.delete("/api/entries/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTimeEntry(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[ENTRIES DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Catch-all - MUST be last, after all other routes
   app.all("*", (req, res) => {
     console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
