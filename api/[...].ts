@@ -1,6 +1,4 @@
 import serverless from "serverless-http";
-import { app } from "../server/app.js";
-import { registerRoutes } from "../server/routes.js";
 
 let handler: any = null;
 let initialized = false;
@@ -10,6 +8,16 @@ async function getHandler() {
     initialized = true;
     const startTime = Date.now();
     try {
+      console.log("[INIT] Starting dynamic initialization...");
+
+      console.log("[INIT] Importing app...");
+      const { app } = await import("../server/app.js");
+      console.log("[INIT] App imported.");
+
+      console.log("[INIT] Importing routes...");
+      const { registerRoutes } = await import("../server/routes.js");
+      console.log("[INIT] Routes imported.");
+
       console.log("[INIT] Initializing serverless handler...");
       console.log("[INIT] Environment:", {
         VERCEL: process.env.VERCEL,
