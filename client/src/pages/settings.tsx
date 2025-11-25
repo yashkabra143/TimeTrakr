@@ -381,11 +381,11 @@ export default function Settings() {
         <TabsContent value="financials" className="space-y-4 md:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Deductions & Taxes</CardTitle>
-                <CardDescription>Set calculation logic for net income.</CardDescription>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-lg md:text-xl">Deductions & Taxes</CardTitle>
+                <CardDescription className="text-xs md:text-sm mt-1">Set calculation logic for net income.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <Form {...deductionForm}>
                   <form onSubmit={deductionForm.handleSubmit(onDeductionSubmit)} className="space-y-4">
                     <FormField
