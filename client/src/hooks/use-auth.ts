@@ -7,26 +7,47 @@ export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const verifyAuth = async () => {
-      setIsLoading(true);
-      const user = await checkAuth();
-      if (user) {
-        setUser(user);
-        setIsAuthenticated(true);
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
+      try {
+        const user = await checkAuth();
+        if (isMounted) {
+          if (user) {
+            setUser(user);
+            setIsAuthenticated(true);
+          } else {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        if (isMounted) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     };
 
     verifyAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const logout = async () => {
-    await logoutUser();
-    setUser(null);
-    setIsAuthenticated(false);
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+    }
   };
 
   return {
