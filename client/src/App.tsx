@@ -8,6 +8,8 @@ import QuickEntry from "@/pages/quick-entry";
 import Weekly from "@/pages/weekly";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+import { useAuth } from "@/hooks/use-auth";
 
 function Router() {
   return (
@@ -24,10 +26,29 @@ function Router() {
 }
 
 function App() {
+  const { isLoading, isAuthenticated } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 mx-auto mb-4 animate-pulse" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Router />
-      <Toaster />
+      {!isAuthenticated ? (
+        <Login />
+      ) : (
+        <>
+          <Router />
+          <Toaster />
+        </>
+      )}
     </QueryClientProvider>
   );
 }

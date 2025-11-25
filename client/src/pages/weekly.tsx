@@ -52,47 +52,48 @@ export default function Weekly() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+      <div className="flex flex-col gap-4 md:gap-0 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading">Weekly Tracking</h1>
-          <p className="text-muted-foreground">Detailed breakdown of your week.</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Weekly Tracking</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Detailed breakdown of your week.</p>
         </div>
-        
-        <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevWeek} data-testid="button-prev-week">
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-card p-2 rounded-lg border shadow-sm">
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={prevWeek} data-testid="button-prev-week">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="px-4 font-medium min-w-[200px] text-center flex items-center justify-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-            {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+          <div className="px-2 sm:px-4 font-medium text-center text-sm md:text-base flex items-center justify-center gap-2 whitespace-nowrap min-w-fit md:min-w-[200px]">
+            <CalendarIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <span className="hidden sm:inline">{format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}</span>
+            <span className="sm:hidden">{format(weekStart, "MMM d")} - {format(weekEnd, "d")}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={nextWeek} data-testid="button-next-week">
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={nextWeek} data-testid="button-next-week">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <div className="w-px h-6 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={goToToday} data-testid="button-today">
+          <div className="hidden sm:block w-px h-6 bg-border mx-1" />
+          <Button variant="ghost" size="sm" className="h-10" onClick={goToToday} data-testid="button-today">
             Today
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {projects.map(project => {
           const totals = getProjectWeeklyTotal(project.id);
           
           return (
-            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col" data-testid={`project-card-${project.id}`}>
+            <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-200" data-testid={`project-card-${project.id}`}>
               <div className="h-2 w-full" style={{ backgroundColor: project.color }} />
-              <CardHeader className="pb-2">
-                <CardTitle className="flex justify-between items-center text-lg">
-                  {project.name}
-                  <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full">
+              <CardHeader className="pb-2 p-4 md:p-6">
+                <CardTitle className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-base md:text-lg">
+                  <span>{project.name}</span>
+                  <span className="text-xs md:text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full w-fit">
                     ${project.rate}/hr
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-4">
+              <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6">
                 {/* Weekly Summary Card */}
                 <div className="bg-muted/30 rounded-lg p-4 space-y-2 border border-border/50">
                   <div className="flex justify-between items-baseline">
@@ -119,21 +120,21 @@ export default function Weekly() {
                   {days.map(day => {
                     const data = getDayData(project.id, day);
                     const isToday = isSameDay(day, new Date());
-                    
+
                     return (
-                      <div 
-                        key={day.toISOString()} 
+                      <div
+                        key={day.toISOString()}
                         className={cn(
-                          "flex items-center justify-between p-2 rounded text-sm",
-                          data.hours > 0 ? "bg-primary/5" : "text-muted-foreground",
+                          "flex items-center justify-between p-2.5 md:p-3 rounded text-sm transition-colors duration-150",
+                          data.hours > 0 ? "bg-primary/5 hover:bg-primary/10" : "text-muted-foreground hover:bg-muted/50",
                           isToday && "ring-1 ring-primary ring-inset"
                         )}
                       >
-                        <span className={cn("w-8 font-medium", isToday && "text-primary")}>{format(day, "EEE")}</span>
-                        <span className="flex-1 text-center text-xs text-muted-foreground">
+                        <span className={cn("w-8 md:w-10 font-medium", isToday && "text-primary")}>{format(day, "EEE")}</span>
+                        <span className="flex-1 text-center text-xs md:text-sm text-muted-foreground">
                           {data.hours > 0 ? `$${data.gross.toFixed(0)}` : '-'}
                         </span>
-                        <span className={cn("font-medium", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
+                        <span className={cn("font-medium text-right", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
                           {data.hours > 0 ? `${data.hours}h` : '-'}
                         </span>
                       </div>

@@ -207,26 +207,26 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-12">
+    <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto pb-12 px-4 md:px-0">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading">Settings</h1>
-        <p className="text-muted-foreground">Manage your preferences, rates, and data.</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Manage your preferences, rates, and data.</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general">General & Projects</TabsTrigger>
-          <TabsTrigger value="financials">Financials</TabsTrigger>
-          <TabsTrigger value="data">Data Management</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="general" className="text-xs md:text-sm">General & Projects</TabsTrigger>
+          <TabsTrigger value="financials" className="text-xs md:text-sm">Financials</TabsTrigger>
+          <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
+        <TabsContent value="general" className="space-y-4 md:space-y-6">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <CardTitle>Project Configuration</CardTitle>
-                  <CardDescription>Manage your freelance projects and hourly rates.</CardDescription>
+                  <CardTitle className="text-lg md:text-xl">Project Configuration</CardTitle>
+                  <CardDescription className="text-xs md:text-sm mt-1">Manage your freelance projects and hourly rates.</CardDescription>
                 </div>
                 <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
                   <DialogTrigger asChild>
@@ -315,45 +315,46 @@ export default function Settings() {
                     </div>
                   ) : (
                     projectForm.watch("projects").map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border rounded-lg bg-muted/20">
-                        <div className="col-span-1 md:col-span-1 flex justify-center pb-3">
-                          <div className="w-6 h-6 rounded-full" style={{ backgroundColor: field.color }} />
+                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-end p-3 md:p-4 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors duration-150">
+                        <div className="flex items-center gap-3 md:col-span-1">
+                          <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: field.color }} />
                         </div>
-                        <div className="col-span-11 md:col-span-5">
+                        <div className="col-span-1 md:col-span-5">
                           <FormField
                             control={projectForm.control}
                             name={`projects.${index}.name`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Project Name</FormLabel>
+                                <FormLabel className="text-xs md:text-sm">Project Name</FormLabel>
                                 <FormControl>
-                                  <Input {...field} data-testid={`input-project-name-${index}`} />
+                                  <Input {...field} data-testid={`input-project-name-${index}`} className="text-sm" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                        <div className="col-span-12 md:col-span-3">
+                        <div className="col-span-1 md:col-span-3">
                           <FormField
                             control={projectForm.control}
                             name={`projects.${index}.rate`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Hourly Rate ($)</FormLabel>
+                                <FormLabel className="text-xs md:text-sm">Hourly Rate ($)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} />
+                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} className="text-sm" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                        <div className="col-span-12 md:col-span-2 flex justify-end pb-3">
+                        <div className="col-span-1 md:col-span-2 flex justify-end md:pb-0">
                           <Button
                             type="button"
                             variant="outline"
                             size="icon"
+                            className="h-10 w-10"
                             onClick={() => setDeleteProjectId(field.id)}
                             data-testid={`button-delete-project-${index}`}
                           >
@@ -377,14 +378,14 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="financials" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TabsContent value="financials" className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Deductions & Taxes</CardTitle>
-                <CardDescription>Set calculation logic for net income.</CardDescription>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-lg md:text-xl">Deductions & Taxes</CardTitle>
+                <CardDescription className="text-xs md:text-sm mt-1">Set calculation logic for net income.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <Form {...deductionForm}>
                   <form onSubmit={deductionForm.handleSubmit(onDeductionSubmit)} className="space-y-4">
                     <FormField
@@ -450,11 +451,11 @@ export default function Settings() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Currency Conversion</CardTitle>
-                <CardDescription>Set the USD to INR exchange rate.</CardDescription>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-lg md:text-xl">Currency Conversion</CardTitle>
+                <CardDescription className="text-xs md:text-sm mt-1">Set the USD to INR exchange rate.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <Form {...currencyForm}>
                   <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-6">
                     <div className="bg-primary/5 p-6 rounded-xl text-center">
@@ -511,15 +512,15 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        <TabsContent value="data" className="space-y-6">
+        <TabsContent value="data" className="space-y-4 md:space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Backup & Restore</CardTitle>
-              <CardDescription>Export your data to JSON.</CardDescription>
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="text-lg md:text-xl">Backup & Restore</CardTitle>
+              <CardDescription className="text-xs md:text-sm mt-1">Export your data to JSON.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button onClick={handleExport} className="flex-1" data-testid="button-export">
+            <CardContent className="p-4 md:p-6 space-y-4">
+              <div className="flex flex-col gap-3">
+                <Button onClick={handleExport} className="w-full" data-testid="button-export">
                   <Download className="w-4 h-4 mr-2" />
                   Export Data
                 </Button>

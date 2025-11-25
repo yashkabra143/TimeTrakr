@@ -126,32 +126,34 @@ export default function Dashboard() {
               value={(weekSummary.hours || 0).toFixed(2)}
               subValue="Hours logged this week"
               icon={Clock}
-              className="bg-white dark:bg-card"
             />
             <StatsCard
               title="Gross Earnings"
               value={`$${(weekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
+              className="value-accent"
             />
             <StatsCard
               title="Net Income (USD)"
               value={`$${(weekSummary.netUsd || 0).toFixed(2)}`}
               subValue="After deductions"
               icon={DollarSign}
-              className="text-primary"
+              className="value-success"
             />
             <StatsCard
               title="Net Income (INR)"
               value={`₹${(weekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
               subValue={`@ ₹${currency?.usdToInr || 0}/$`}
               icon={Wallet}
+              className="value-success"
             />
             <StatsCard
               title="Total Deductions"
               value={`$${(weekSummary.deductions || 0).toFixed(2)}`}
               subValue="Fees & Taxes"
               icon={PieChartIcon}
+              className="value-warning"
             />
           </div>
         </TabsContent>
@@ -163,32 +165,34 @@ export default function Dashboard() {
               value={(lastWeekSummary.hours || 0).toFixed(2)}
               subValue="Hours logged last week"
               icon={Clock}
-              className="bg-white dark:bg-card"
             />
             <StatsCard
               title="Gross Earnings"
               value={`$${(lastWeekSummary.grossUsd || 0).toFixed(2)}`}
               subValue="Before deductions"
               icon={DollarSign}
+              className="value-accent"
             />
             <StatsCard
               title="Net Income (USD)"
               value={`$${(lastWeekSummary.netUsd || 0).toFixed(2)}`}
               subValue="After deductions"
               icon={DollarSign}
-              className="text-primary"
+              className="value-success"
             />
             <StatsCard
               title="Net Income (INR)"
               value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
               subValue={`@ ₹${currency?.usdToInr || 0}/$`}
               icon={Wallet}
+              className="value-success"
             />
             <StatsCard
               title="Total Deductions"
               value={`$${(lastWeekSummary.deductions || 0).toFixed(2)}`}
               subValue="Fees & Taxes"
               icon={PieChartIcon}
+              className="value-warning"
             />
           </div>
         </TabsContent>
@@ -196,26 +200,26 @@ export default function Dashboard() {
         <TabsContent value="month" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
-            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
+            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
+            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
+            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
           </div>
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} />
-            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="text-primary" />
-            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} />
-            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} />
+            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
+            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
+            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
+            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
           </div>
         </TabsContent>
       </Tabs>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 border-none shadow-sm">
+        <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle>Weekly Activity</CardTitle>
             <CardDescription>
@@ -223,39 +227,48 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={lineChartData}>
-                <XAxis
-                  dataKey="name"
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}h`}
-                />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="hours"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "hsl(var(--primary))" }}
-                  activeDot={{ r: 8 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {lineChartData.some(d => d.hours > 0) ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={lineChartData}>
+                  <XAxis
+                    dataKey="name"
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value}h`}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="hours"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                    activeDot={{ r: 8 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-sm">No activity this week</p>
+                  <p className="text-xs mt-1">Log hours to see your activity here</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="col-span-3 border-none shadow-sm">
+        <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle>Project Distribution</CardTitle>
             <CardDescription>
@@ -263,30 +276,39 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={projectPieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {projectPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {projectPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={projectPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {projectPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-sm">No projects tracked</p>
+                  <p className="text-xs mt-1">Create a project and log hours to get started</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm">
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader>
           <CardTitle>Recent Entries</CardTitle>
           <CardDescription>
@@ -295,27 +317,31 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {entries.slice(0, 10).map((entry) => {
-              const project = projects.find(p => p.id === entry.projectId);
-              return (
-                <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors" data-testid={`entry-${entry.id}`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-2 h-12 rounded-full" style={{ backgroundColor: project?.color || 'gray' }} />
-                    <div>
-                      <p className="font-medium">{project?.name || 'Unknown Project'}</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+            {entries.length > 0 ? (
+              entries.slice(0, 10).map((entry) => {
+                const project = projects.find(p => p.id === entry.projectId);
+                return (
+                  <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150" data-testid={`entry-${entry.id}`}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-2 h-12 rounded-full" style={{ backgroundColor: project?.color || 'gray' }} />
+                      <div>
+                        <p className="font-medium">{project?.name || 'Unknown Project'}</p>
+                        <p className="text-sm text-muted-foreground">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{entry.hours} hrs</p>
+                      <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold">{entry.hours} hrs</p>
-                    <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
-                  </div>
+                )
+              })
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">No time entries yet</p>
+                  <p className="text-xs">Start logging hours to track your productivity and earnings</p>
                 </div>
-              )
-            })}
-            {entries.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No entries found. Start tracking time!
               </div>
             )}
           </div>

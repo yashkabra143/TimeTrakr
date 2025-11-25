@@ -6,11 +6,13 @@ import {
   Calendar,
   Settings,
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/use-auth";
 import logoUrl from "@assets/generated_images/minimalist_abstract_hourglass_logo.png";
 
 const NAV_ITEMS = [
@@ -21,16 +23,20 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
       <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
         <div className="w-8 h-8 rounded-lg overflow-hidden">
-          <img src={logoUrl} alt="TimeFlow Logo" className="w-full h-full object-cover" />
+          <img src={logoUrl} alt="Yash Upwork Tracker Logo" className="w-full h-full object-cover" />
         </div>
-        <h1 className="text-xl font-bold font-heading tracking-tight">TimeFlow</h1>
+        <div className="flex flex-col">
+          <h1 className="text-xs uppercase font-bold font-heading tracking-tight text-muted-foreground">Yash</h1>
+          <h1 className="text-sm font-bold font-heading tracking-tight">Upwork Tracker</h1>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
@@ -57,11 +63,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="bg-secondary/50 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground mb-1">Upwork Tracker</p>
-          <p className="text-sm font-medium">Yash Kabra</p>
+      <div className="p-4 border-t border-sidebar-border mt-auto space-y-3">
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-sm font-bold text-primary">{user?.username.charAt(0).toUpperCase()}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground mb-0.5 truncate">Upwork Freelancer</p>
+            <p className="text-sm font-semibold truncate capitalize">{user?.username}</p>
+          </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+          onClick={async () => {
+            await logout();
+            navigate("/login");
+          }}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Logout
+        </Button>
       </div>
     </div>
   );
