@@ -31,9 +31,17 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// Debug logging middleware
+// Debug logging middleware - log ALL request details
 app.use((req, res, next) => {
-  console.log(`[DEBUG] Request: ${req.method} ${req.path}`);
+  console.log(`[DEBUG] Request: ${req.method} ${req.path}`, {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    body: req.body ? 'has body' : 'no body',
+    query: Object.keys(req.query || {}).length > 0 ? req.query : 'no query'
+  });
   next();
 });
 
