@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import {
@@ -8,8 +8,115 @@ import {
   insertTimeEntrySchema
 } from "../shared/schema.js";
 import { z } from "zod";
+import session from "express-session";
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import MemoryStore from "memorystore";
+import type { Request as PassportRequest } from "passport";
+
+// Simple in-memory user storage for authentication
+const users = new Map<string, { id: string; username: string; password: string }>();
+
+// Initialize users with a default user if empty
+if (users.size === 0) {
+  const defaultUser = {
+    id: "user1",
+    username: "admin",
+    password: "password123",
+  };
+  users.set("admin", defaultUser);
+}
+
+const MemStore = MemoryStore(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configure session
+  app.use(session({
+    store: new MemStore({
+      checkPeriod: 86400000,
+    }),
+    secret: "time-tracker-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  }));
+
+  // Configure passport
+  passport.use(new LocalStrategy(
+    {
+      usernameField: "username",
+      passwordField: "password",
+    },
+    (username, password, done) => {
+      const user = users.get(username);
+      if (!user || user.password !== password) {
+        return done(null, false, { message: "Invalid username or password" });
+      }
+      return done(null, user);
+    }
+  ));
+
+  passport.serializeUser((user: any, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser((id: string, done) => {
+    const user = Array.from(users.values()).find(u => u.id === id);
+    if (user) {
+      done(null, user);
+    } else {
+      done(null, false);
+    }
+  });
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Middleware to check if user is authenticated
+  const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      next();
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  };
+
+  // Authentication routes
+  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+    res.json({
+      success: true,
+      user: {
+        id: (req.user as any)?.id,
+        username: (req.user as any)?.username,
+      }
+    });
+  });
+
+  app.post("/api/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to logout" });
+      } else {
+        res.json({ success: true });
+      }
+    });
+  });
+
+  app.get("/api/me", (req, res) => {
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      res.json({
+        id: (req.user as any)?.id,
+        username: (req.user as any)?.username,
+      });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
   // Health check endpoint
   app.get("/api/health", async (_req, res) => {
     try {
