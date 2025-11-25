@@ -17,7 +17,10 @@ console.log("Database configured for serverless (Neon HTTP driver)");
 console.log("Database connection initialized:", process.env.DATABASE_URL ? "✓ URL is set" : "✗ URL is missing");
 
 // Create HTTP client
+console.log("[DB] Initializing Neon client...");
 const sql = neon(process.env.DATABASE_URL);
 
 // Create drizzle instance with HTTP client
+console.log("[DB] Initializing Drizzle...");
 export const db = drizzle(sql, { schema, logger: true });
+console.log("[DB] Drizzle initialized.");
