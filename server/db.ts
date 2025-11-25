@@ -20,4 +20,4 @@ console.log("Database connection initialized:", process.env.DATABASE_URL ? "✓ 
 const sql = neon(process.env.DATABASE_URL);
 
 // Create drizzle instance with HTTP client
-export const db = drizzle(sql, { schema });
+export const db = drizzle(sql, { schema, logger: true });

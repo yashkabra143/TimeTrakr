@@ -147,6 +147,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple ping endpoint to check if API is responsive (no DB)
+  app.get("/api/ping", (_req, res) => {
+    res.json({ status: "pong", timestamp: Date.now() });
+  });
+
   // Health check endpoint
   app.get("/api/health", async (_req, res) => {
     try {
