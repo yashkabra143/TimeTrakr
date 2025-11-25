@@ -60,10 +60,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="bg-secondary/50 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground mb-1">Upwork Tracker</p>
-          <p className="text-sm font-medium">Yash Kabra</p>
+      <div className="p-4 border-t border-sidebar-border mt-auto">
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-sm font-bold text-primary">YK</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground mb-0.5 truncate">Upwork Freelancer</p>
+            <p className="text-sm font-semibold truncate">Yash Kabra</p>
+          </div>
         </div>
       </div>
     </div>
