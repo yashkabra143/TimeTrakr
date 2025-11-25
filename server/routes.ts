@@ -133,8 +133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Projects
-  app.get("/api/projects", async (_req, res) => {
+  // Projects (protected routes)
+  app.get("/api/projects", requireAuth, async (_req, res) => {
     try {
       const projects = await storage.getProjects();
       res.json(projects);
@@ -144,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", async (req, res) => {
+  app.post("/api/projects", requireAuth, async (req, res) => {
     try {
       const project = insertProjectSchema.parse(req.body);
       const newProject = await storage.createProject(project);
