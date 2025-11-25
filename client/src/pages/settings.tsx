@@ -220,13 +220,13 @@ export default function Settings() {
           <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
+        <TabsContent value="general" className="space-y-4 md:space-y-6">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <CardTitle>Project Configuration</CardTitle>
-                  <CardDescription>Manage your freelance projects and hourly rates.</CardDescription>
+                  <CardTitle className="text-lg md:text-xl">Project Configuration</CardTitle>
+                  <CardDescription className="text-xs md:text-sm mt-1">Manage your freelance projects and hourly rates.</CardDescription>
                 </div>
                 <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
                   <DialogTrigger asChild>
