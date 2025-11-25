@@ -32,27 +32,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("[ROUTES] Starting registration...");
 
   // Minimal setup for debugging
-  app.get("/api/ping", (_req, res) => {
-    console.log("[PING] Hit!");
-    res.json({ status: "pong", timestamp: Date.now() });
-  });
-
-  /*
-  // ... (commented out everything else)
-  */
-
-  console.log("[ROUTES] Registration complete.");
-  const httpServer = createServer(app);
-  return httpServer;
-
-  /*
   // Handle root path if prefix is stripped
   app.get("/", (_req, res) => {
     console.log("[ROUTE] Root handler hit");
     res.json({ status: "ok", path: "/" });
   });
-  */
 
+  // Simple ping endpoint
+  app.get("/api/ping", (_req, res) => {
+    console.log("[PING] Hit!");
+    res.json({ status: "pong", timestamp: Date.now() });
+  });
+
+  // Catch-all
+  app.use("*", (req, res) => {
+    console.log(`[404] Unhandled path: ${req.path}`);
+    res.status(404).json({ error: "Not Found", path: req.path });
+  });
+
+  const httpServer = createServer(app);
   return httpServer;
 
   /*
