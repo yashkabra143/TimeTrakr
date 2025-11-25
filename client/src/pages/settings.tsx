@@ -512,15 +512,15 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        <TabsContent value="data" className="space-y-6">
+        <TabsContent value="data" className="space-y-4 md:space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Backup & Restore</CardTitle>
-              <CardDescription>Export your data to JSON.</CardDescription>
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="text-lg md:text-xl">Backup & Restore</CardTitle>
+              <CardDescription className="text-xs md:text-sm mt-1">Export your data to JSON.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button onClick={handleExport} className="flex-1" data-testid="button-export">
+            <CardContent className="p-4 md:p-6 space-y-4">
+              <div className="flex flex-col gap-3">
+                <Button onClick={handleExport} className="w-full" data-testid="button-export">
                   <Download className="w-4 h-4 mr-2" />
                   Export Data
                 </Button>
