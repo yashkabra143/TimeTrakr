@@ -134,16 +134,6 @@ export default function Login() {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Demo Credentials:</p>
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-semibold">Username:</span> admin
-              </p>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-semibold">Password:</span> password123
-              </p>
-            </div>
           </CardContent>
         </Card>
 
