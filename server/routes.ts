@@ -242,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.post("/api/entries", async (req, res) => {
     try {
       const baseEntry = insertTimeEntrySchema.parse(req.body);
-      
+
       // Get project to get the rate
       const project = await storage.getProject(baseEntry.projectId);
       if (!project) {
@@ -279,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       // Net calculations
       const netBeforeTransfer = grossUsd - deductionService - deductionTds - deductionGst;
       const netUsd = Math.max(0, netBeforeTransfer - deductionTransfer);
-      
+
       const exchangeRate = Number(currency.usdToInr) || 0;
       const netInr = netUsd * exchangeRate;
 
@@ -295,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         netInr,
         exchangeRate,
       };
-      
+
       const created = await storage.createTimeEntry(entry);
       res.status(201).json(created);
     } catch (error) {
