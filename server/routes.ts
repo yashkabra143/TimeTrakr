@@ -34,12 +34,15 @@ const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_N
 export async function registerRoutes(app: Express): Promise<Server | null> {
   console.log("[ROUTES] Starting registration...", { isServerless });
 
-  // Minimal setup for debugging
-  // Handle root path if prefix is stripped
-  app.get("/", (_req, res) => {
-    console.log("[ROUTE] Root handler hit");
-    res.json({ status: "ok", path: "/" });
-  });
+  // In development, Vite handles the root route, so we skip it
+  // In production/serverless, static files are served separately
+  if (process.env.NODE_ENV === 'production' || isServerless) {
+    // Minimal setup for debugging in production
+    app.get("/", (_req, res) => {
+      console.log("[ROUTE] Root handler hit");
+      res.json({ status: "ok", path: "/" });
+    });
+  }
 
   // Simple ping endpoint
   app.get("/api/ping", (_req, res) => {
@@ -317,17 +320,20 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // Catch-all - MUST be last, after all other routes
-  app.all("*", (req, res) => {
-    console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
-      method: req.method,
-      path: req.path,
-      url: req.url,
-      originalUrl: req.originalUrl
+  // In development, Vite handles non-API routes, so we only add catch-all in production/serverless
+  if (process.env.NODE_ENV === 'production' || isServerless) {
+    app.all("*", (req, res) => {
+      console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
+        method: req.method,
+        path: req.path,
+        url: req.url,
+        originalUrl: req.originalUrl
+      });
+      if (!res.headersSent) {
+        res.status(404).json({ error: "Not Found", path: req.path, method: req.method });
+      }
     });
-    if (!res.headersSent) {
-      res.status(404).json({ error: "Not Found", path: req.path, method: req.method });
-    }
-  });
+  }
 
   // Only create HTTP server for traditional deployments (not serverless)
   // In serverless environments (Vercel, AWS Lambda), the platform handles the server

@@ -18,6 +18,10 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
@@ -36,7 +40,7 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
-  
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -68,6 +72,12 @@
 
   --accent: 250 80% 96%; /* Very light indigo tint */
   --accent-foreground: 222.2 47.4% 11.2%;
+
+  --success: 142 71% 45%; /* Vibrant emerald green */
+  --success-foreground: 210 40% 98%;
+
+  --warning: 39 89% 47%; /* Warm orange */
+  --warning-foreground: 210 40% 98%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
@@ -117,6 +127,12 @@
   --accent: 217.2 32.6% 17.5%;
   --accent-foreground: 210 40% 98%;
 
+  --success: 142 71% 55%; /* Lighter emerald for dark mode */
+  --success-foreground: 222 47% 11%;
+
+  --warning: 39 89% 57%; /* Lighter orange for dark mode */
+  --warning-foreground: 222 47% 11%;
+
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
 
@@ -155,23 +171,82 @@
 @layer components {
   .value-success {
     & div[class*="text-2xl"] {
-      @apply text-green-600 dark:text-green-400;
+      @apply text-success dark:text-success;
     }
   }
 
   .value-accent {
     & div[class*="text-2xl"] {
-      @apply text-amber-600 dark:text-amber-400;
+      @apply text-warning dark:text-warning;
     }
   }
 
   .value-warning {
     & div[class*="text-2xl"] {
-      @apply text-red-600 dark:text-red-400;
+      @apply text-destructive dark:text-destructive;
     }
   }
 
   .stats-card-hover {
     @apply hover:shadow-lg transition-all duration-200;
+  }
+
+  /* Card Styling */
+  .card-elevated {
+    @apply rounded-lg border border-border bg-card shadow-md hover:shadow-xl transition-all duration-300;
+  }
+
+  .card-subtle {
+    @apply rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-success {
+    @apply bg-gradient-to-br from-success/10 to-success/5;
+  }
+
+  .gradient-warning {
+    @apply bg-gradient-to-br from-warning/10 to-warning/5;
+  }
+
+  .gradient-accent {
+    @apply bg-gradient-to-br from-accent to-accent/50;
+  }
+
+  /* Smooth animations */
+  @keyframes countUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .count-up {
+    animation: countUp 0.6s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .slide-in-right {
+    animation: slideInRight 0.5s ease-out;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+    50% { box-shadow: 0 0 0 8px rgba(250, 128, 114, 0.1); }
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+
+  /* Button styling with gradients */
+  .btn-primary-gradient {
+    @apply bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg transition-all duration-200;
+  }
+
+  .btn-success-gradient {
+    @apply bg-gradient-to-r from-success to-success/80 hover:shadow-lg transition-all duration-200;
   }
 }

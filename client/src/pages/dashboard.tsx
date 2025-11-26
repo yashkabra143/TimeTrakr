@@ -120,7 +120,7 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="week" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatsCard
               title="Total Hours"
               value={(weekSummary.hours || 0).toFixed(2)}
@@ -159,7 +159,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="last_week" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatsCard
               title="Total Hours"
               value={(lastWeekSummary.hours || 0).toFixed(2)}
@@ -198,7 +198,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="month" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
             <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
             <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
@@ -208,7 +208,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
             <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
             <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
