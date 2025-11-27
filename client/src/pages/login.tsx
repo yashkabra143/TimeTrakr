@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { Lock, Mail, ArrowRight } from "lucide-react";
-import logoUrl from "@assets/generated_images/minimalist_abstract_hourglass_logo.png";
+
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -94,19 +94,19 @@ export default function Login() {
                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0.3" />
                 </linearGradient>
               </defs>
-              
+
               {/* Sand particles animation concept */}
               <circle cx="200" cy="200" r="180" fill="none" stroke="white" strokeWidth="0.5" opacity="0.1" />
               <circle cx="200" cy="200" r="140" fill="none" stroke="white" strokeWidth="0.5" opacity="0.15" />
-              
+
               {/* Hourglass top bulb */}
               <ellipse cx="200" cy="120" rx="50" ry="55" fill="url(#glassGradient)" stroke="white" strokeWidth="2" />
               {/* Hourglass bottom bulb */}
               <ellipse cx="200" cy="280" rx="50" ry="55" fill="url(#glassGradient)" stroke="white" strokeWidth="2" opacity="0.6" />
-              
+
               {/* Connecting tube */}
               <rect x="190" y="160" width="20" height="80" fill="url(#glassGradient)" stroke="white" strokeWidth="2" />
-              
+
               {/* Sand particles flowing */}
               <g className="animate-pulse">
                 <rect x="185" y="165" width="4" height="4" fill="white" opacity="0.8" />
@@ -156,8 +156,8 @@ export default function Login() {
           <div className="w-full max-w-sm relative z-10">
             {/* Logo Section */}
             <div className="flex flex-col items-center gap-4 mb-10 animate-slide-in">
-              <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300">
-                <img src={logoUrl} alt="Yash Upwork Tracker" className="w-full h-full object-cover" />
+              <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300 bg-white p-2">
+                <img src="/logo.svg" alt="Upwork Tracker" className="w-full h-full object-contain" />
               </div>
               <div className="text-center">
                 <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">Welcome</p>
@@ -176,13 +176,13 @@ export default function Login() {
               <form onSubmit={handleLogin} className="space-y-6">
                 {/* Username Input */}
                 <div className="space-y-2 animate-slide-in" style={{ animationDelay: "0.2s" }}>
-                  <label htmlFor="username" className="text-sm font-semibold text-foreground block">
+                  <label htmlFor="login-username" className="text-sm font-semibold text-foreground block">
                     Username
                   </label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors duration-300" />
                     <Input
-                      id="username"
+                      id="login-username"
                       type="text"
                       placeholder="Enter your username"
                       value={username}
@@ -197,13 +197,13 @@ export default function Login() {
 
                 {/* Password Input */}
                 <div className="space-y-2 animate-slide-in" style={{ animationDelay: "0.3s" }}>
-                  <label htmlFor="password" className="text-sm font-semibold text-foreground block">
+                  <label htmlFor="login-password" className="text-sm font-semibold text-foreground block">
                     Password
                   </label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors duration-300" />
                     <Input
-                      id="password"
+                      id="login-password"
                       type="password"
                       placeholder="Enter your password"
                       value={password}

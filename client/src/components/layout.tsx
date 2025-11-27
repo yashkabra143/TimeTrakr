@@ -27,11 +27,6 @@ import {
 import { EarningsCalculator } from "@/components/earnings-calculator";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
-const UpworkLogo = () => (
-  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm0-8h-2V7h2v2zm4 8h-2v-3.5c0-.83-.67-1.5-1.5-1.5S10 12.67 10 13.5V17h-2V9h2v.96c.48-.73 1.45-1.36 2.5-1.36 1.93 0 3.5 1.57 3.5 3.5V17z" fill="currentColor"/>
-  </svg>
-);
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -75,7 +70,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg overflow-hidden text-primary">
-              <UpworkLogo />
+              <img src="/logo.svg" alt="Upwork Tracker" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col hidden sm:block">
               <h1 className="text-xs uppercase font-bold font-heading tracking-tight text-muted-foreground">Yash</h1>
