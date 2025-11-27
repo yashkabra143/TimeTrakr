@@ -23,7 +23,7 @@ export function ProductivityInsights() {
     // Weekly entries
     const weeklyEntries = entries.filter(e => {
       if (!e.date) return false;
-      const entryDate = parseISO(e.date);
+      const entryDate = typeof e.date === 'string' ? parseISO(e.date) : e.date;
       return entryDate >= weekStart && entryDate <= weekEnd;
     });
 
@@ -146,12 +146,12 @@ export function ProductivityInsights() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Hours/Day</span>
-              <span className="text-lg font-bold">{insights.averageDailyHours.toFixed(1)}h</span>
+              <span className="text-lg font-bold">{(insights.averageDailyHours || 0).toFixed(1)}h</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Earnings/Day</span>
               <span className="text-lg font-bold text-success">
-                ${insights.averageDailyEarnings.toFixed(2)}
+                ${(insights.averageDailyEarnings || 0).toFixed(2)}
               </span>
             </div>
           </div>
@@ -170,12 +170,12 @@ export function ProductivityInsights() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Total Hours</span>
-              <span className="text-lg font-bold">{insights.totalWeeklyHours.toFixed(1)}h</span>
+              <span className="text-lg font-bold">{(insights.totalWeeklyHours || 0).toFixed(1)}h</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Total Earnings</span>
               <span className="text-lg font-bold text-success">
-                ${insights.totalWeeklyEarnings.toFixed(2)}
+                ${(insights.totalWeeklyEarnings || 0).toFixed(2)}
               </span>
             </div>
           </div>

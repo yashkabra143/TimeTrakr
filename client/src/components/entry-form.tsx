@@ -176,7 +176,10 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                         selected={field.value}
                         onSelect={field.onChange}
                         disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
+                          date > new Date() ||
+                          date < new Date("1900-01-01") ||
+                          date.getDay() === 0 || // Sunday
+                          date.getDay() === 6    // Saturday
                         }
                         initialFocus
                       />
