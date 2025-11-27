@@ -73,7 +73,11 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       return res.json({
         user: {
           id: user.id,
-          username: user.username
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          dateOfBirth: user.dateOfBirth,
+          profilePicture: user.profilePicture
         }
       });
     } catch (error) {
@@ -116,6 +120,55 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       res.json({ message: "Password updated successfully" });
     } catch (error) {
       console.error("[CHANGE PASSWORD] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/user", async (req, res) => {
+    try {
+      const { currentUsername, username, email, fullName, dateOfBirth, profilePicture } = req.body;
+
+      if (!currentUsername) {
+        return res.status(400).json({ message: "Current username is required" });
+      }
+
+      const user = await storage.getUser(currentUsername);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if new username is already taken (if username is being changed)
+      if (username && username !== currentUsername) {
+        const existingUser = await storage.getUser(username);
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(user.id, {
+        username: username || currentUsername,
+        email,
+        fullName,
+        dateOfBirth,
+        profilePicture
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user" });
+      }
+
+      return res.json({
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          dateOfBirth: updatedUser.dateOfBirth,
+          profilePicture: updatedUser.profilePicture
+        }
+      });
+    } catch (error) {
+      console.error("[UPDATE USER] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

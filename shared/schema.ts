@@ -50,6 +50,10 @@ export const timeEntries = pgTable("time_entries", {
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
+  email: text("email"),
+  fullName: text("full_name"),
+  dateOfBirth: text("date_of_birth"),
+  profilePicture: text("profile_picture"),
   password: text("password").notNull(), // Hashed password
   salt: text("salt").notNull(), // Salt for hashing
   createdAt: timestamp("created_at").defaultNow().notNull(),

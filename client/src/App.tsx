@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import Layout from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
+import Profile from "@/pages/profile";
 import QuickEntry from "@/pages/quick-entry";
 import Weekly from "@/pages/weekly";
 import Settings from "@/pages/settings";
@@ -69,6 +70,9 @@ function App() {
         </Route>
         <Route path="/settings">
           <ProtectedRoute component={Settings} />
+        </Route>
+        <Route path="/profile">
+          <ProtectedRoute component={Profile} />
         </Route>
 
         {/* 404 route */}

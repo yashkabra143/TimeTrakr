@@ -8,7 +8,9 @@ import {
   Menu,
   X,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  User,
+  Lock
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,8 +22,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { EarningsCalculator } from "@/components/earnings-calculator";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 const UpworkLogo = () => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -106,10 +110,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="text-xs text-muted-foreground">Upwork Freelancer</p>
-                    <p className="text-sm font-semibold capitalize">{user?.username}</p>
-                  </div>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none capitalize">{user?.fullName || user?.username}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email || "No email set"}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <ChangePasswordDialog trigger={
+                      <div className="flex items-center w-full cursor-pointer">
+                        <Lock className="mr-2 h-4 w-4" />
+                        <span>Change Password</span>
+                      </div>
+                    } />
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950 cursor-pointer"

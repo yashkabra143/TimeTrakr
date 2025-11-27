@@ -1,6 +1,10 @@
 export interface User {
   id: string;
   username: string;
+  email?: string | null;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  profilePicture?: string | null;
 }
 
 export async function checkAuth(): Promise<User | null> {

@@ -35,7 +35,7 @@ const changePasswordSchema = z.object({
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
-export function ChangePasswordDialog() {
+export function ChangePasswordDialog({ trigger }: { trigger?: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const { toast } = useToast();
 
@@ -88,10 +88,12 @@ export function ChangePasswordDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                    <Lock className="mr-2 h-4 w-4" />
-                    Change Password
-                </Button>
+                {trigger || (
+                    <Button variant="outline" size="sm">
+                        <Lock className="mr-2 h-4 w-4" />
+                        Change Password
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>

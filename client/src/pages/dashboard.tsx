@@ -1,6 +1,13 @@
 import * as React from "react";
 import { StatsCard } from "@/components/ui/stats-card";
-import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Clock,
   DollarSign,
@@ -23,7 +30,6 @@ import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseIS
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 
@@ -134,28 +140,25 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight font-heading">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back. Here's your productivity overview.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <ChangePasswordDialog />
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
-                <Clock className="mr-2 h-4 w-4" />
-                Log Hours
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Quick Log</DialogTitle>
-                <DialogDescription>
-                  Add a new time entry. It will be added to your weekly summary.
-                </DialogDescription>
-              </DialogHeader>
-              <EntryForm onSuccess={() => {
-                document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
-              }} />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
+              <Clock className="mr-2 h-4 w-4" />
+              Log Hours
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Quick Log</DialogTitle>
+              <DialogDescription>
+                Add a new time entry. It will be added to your weekly summary.
+              </DialogDescription>
+            </DialogHeader>
+            <EntryForm onSuccess={() => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
+            }} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs value={dateRange} onValueChange={setDateRange} className="space-y-4">

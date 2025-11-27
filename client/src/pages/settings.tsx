@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject } from "@/lib/hooks";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { useEffect, useState } from "react";
 
 // Predefined color palette for projects
@@ -27,6 +28,12 @@ const PROJECT_COLORS = [
   "#6366f1", // indigo
   "#a855f7", // violet
 ];
+
+const profileSchema = z.object({
+  fullName: z.string().optional().or(z.literal("")),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+});
 
 const projectSchema = z.object({
   projects: z.array(z.object({
@@ -72,6 +79,32 @@ export default function Settings() {
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
+
+  // Initialize user from localStorage
+  const [user, setUser] = useState<any>(() => {
+    const userStr = localStorage.getItem("user");
+    return userStr ? JSON.parse(userStr) : null;
+  });
+
+  // Profile Form
+  const profileForm = useForm({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      fullName: user?.fullName || "",
+      username: user?.username || "",
+      email: user?.email || "",
+    },
+  });
+
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        fullName: user.fullName || "",
+        username: user.username || "",
+        email: user.email || "",
+      });
+    }
+  }, [user]);
 
   // New Project Form
   const newProjectForm = useForm({
@@ -123,6 +156,41 @@ export default function Settings() {
       currencyForm.reset({ usdToInr: currency.usdToInr });
     }
   }, [currency]);
+
+  async function onProfileSubmit(data: z.infer<typeof profileSchema>) {
+    try {
+      const res = await fetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentUsername: user.username,
+          username: data.username,
+          fullName: data.fullName,
+          email: data.email,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update profile");
+      }
+
+      const updatedUser = await res.json();
+      localStorage.setItem("user", JSON.stringify(updatedUser.user));
+      setUser(updatedUser.user);
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update profile",
+      });
+    }
+  }
 
   async function onProjectSubmit(data: z.infer<typeof projectSchema>) {
     for (const p of data.projects) {
@@ -213,12 +281,74 @@ export default function Settings() {
         <p className="text-sm md:text-base text-muted-foreground">Manage your preferences, rates, and data.</p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="profile" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="profile" className="text-xs md:text-sm">Profile</TabsTrigger>
           <TabsTrigger value="general" className="text-xs md:text-sm">General & Projects</TabsTrigger>
           <TabsTrigger value="financials" className="text-xs md:text-sm">Financials</TabsTrigger>
           <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="profile" className="space-y-4 md:space-y-6">
+          <Card>
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="text-lg md:text-xl">Basic Information</CardTitle>
+              <CardDescription className="text-xs md:text-sm mt-1">Update your personal details.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6">
+              <Form {...profileForm}>
+                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+                  <FormField
+                    control={profileForm.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input placeholder="john_doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="john@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="pt-2 flex flex-col gap-3">
+                    <ChangePasswordDialog />
+                    <Button type="submit" className="w-full md:w-auto">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Profile
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="general" className="space-y-4 md:space-y-6">
           <Card>
