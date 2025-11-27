@@ -1,5 +1,6 @@
 import * as React from "react";
 import { StatsCard } from "@/components/ui/stats-card";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import {
   Clock,
   DollarSign,
@@ -134,6 +135,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground">Welcome back. Here's your productivity overview.</p>
         </div>
         <div className="flex items-center gap-2">
+          <ChangePasswordDialog />
           <Dialog>
             <DialogTrigger asChild>
               <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">

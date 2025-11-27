@@ -7,26 +7,13 @@ import {
   insertCurrencySettingsSchema,
   insertTimeEntrySchema
 } from "../shared/schema.js";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 import { z } from "zod";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import MemoryStore from "memorystore";
 
-// Simple in-memory user storage for authentication
-const users = new Map<string, { id: string; username: string; password: string }>();
+const scryptAsync = promisify(scrypt);
 
-// Initialize users with a default user if empty
-if (users.size === 0) {
-  const defaultUser = {
-    id: "user1",
-    username: "admin",
-    password: "password123",
-  };
-  users.set("admin", defaultUser);
-}
 
-const MemStore = MemoryStore(session);
 
 // Check if we're running in a serverless environment
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -50,68 +37,96 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     res.json({ status: "pong", timestamp: Date.now() });
   });
 
+  // Initialize default user if none exists
+  const existingUser = await storage.getUser("admin");
+  if (!existingUser) {
+    const salt = randomBytes(16).toString("hex");
+    const hashedPassword = (await scryptAsync("password123", salt, 64)) as Buffer;
+    await storage.createUser({
+      username: "admin",
+      password: hashedPassword.toString("hex"),
+      salt,
+    });
+    console.log("[AUTH] Created default admin user");
+  }
+
   // Authentication routes
-  // Handle both /api/login and /login (in case path is transformed)
   const loginHandler = async (req: Request, res: Response) => {
     try {
-      console.log("[LOGIN] Attempting login", {
-        method: req.method,
-        path: req.path,
-        url: req.url,
-        body: req.body ? { username: req.body.username, hasPassword: !!req.body.password } : 'no body'
-      });
-      
       const { username, password } = req.body || {};
 
       if (!username || !password) {
-        console.log("[LOGIN] Missing credentials");
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      const user = users.get(username);
-      if (!user || user.password !== password) {
-        console.log("[LOGIN] Invalid credentials for:", username);
+      const user = await storage.getUser(username);
+      if (!user) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      console.log("[LOGIN] Login successful for:", username);
-      // Return user without password
-      return res.json({ 
-        user: { 
-          id: user.id, 
-          username: user.username 
-        } 
+      const hashedPassword = (await scryptAsync(password, user.salt, 64)) as Buffer;
+      if (hashedPassword.toString("hex") !== user.password) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // Return user without password/salt
+      return res.json({
+        user: {
+          id: user.id,
+          username: user.username
+        }
       });
     } catch (error) {
       console.error("[LOGIN] Error:", error);
-      if (!res.headersSent) {
-        return res.status(500).json({ message: "Internal server error" });
-      }
+      res.status(500).json({ message: "Internal server error" });
     }
   };
 
   app.post("/api/login", loginHandler);
-  app.post("/login", loginHandler); // Fallback in case path is transformed
+  app.post("/login", loginHandler);
 
-  app.get("/api/me", async (req, res) => {
+  app.post("/api/change-password", async (req, res) => {
     try {
-      // For now, return null - proper session-based auth would check session here
-      // This is a simple implementation that allows the client to work
-      res.json(null);
+      const { username, currentPassword, newPassword } = req.body;
+
+      if (!username || !currentPassword || !newPassword) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      const user = await storage.getUser(username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const hashedCurrent = (await scryptAsync(currentPassword, user.salt, 64)) as Buffer;
+      if (hashedCurrent.toString("hex") !== user.password) {
+        return res.status(401).json({ message: "Incorrect current password" });
+      }
+
+      // Hash new password
+      const newSalt = randomBytes(16).toString("hex");
+      const hashedNew = (await scryptAsync(newPassword, newSalt, 64)) as Buffer;
+
+      await storage.updateUser(user.id, {
+        password: hashedNew.toString("hex"),
+        salt: newSalt,
+      });
+
+      res.json({ message: "Password updated successfully" });
     } catch (error) {
-      console.error("[ME] Error:", error);
+      console.error("[CHANGE PASSWORD] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
+  app.get("/api/me", async (req, res) => {
+    // Session check would go here
+    res.json(null);
+  });
+
   app.post("/api/logout", async (req, res) => {
-    try {
-      // For now, just return success - proper session-based auth would destroy session here
-      res.json({ message: "Logged out successfully" });
-    } catch (error) {
-      console.error("[LOGOUT] Error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
+    res.json({ message: "Logged out successfully" });
   });
 
   // Projects routes

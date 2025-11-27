@@ -1,16 +1,19 @@
-import { 
-  projects, 
-  deductions, 
-  currencySettings, 
+import {
+  projects,
+  deductions,
+  currencySettings,
   timeEntries,
-  type Project, 
+  users,
+  type Project,
   type InsertProject,
   type Deduction,
   type InsertDeduction,
   type CurrencySetting,
   type InsertCurrencySetting,
   type TimeEntry,
-  type InsertTimeEntry
+  type InsertTimeEntry,
+  type User,
+  type InsertUser
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc } from "drizzle-orm";
@@ -46,6 +49,11 @@ export interface IStorage {
     exchangeRate: number;
   }): Promise<TimeEntry>;
   deleteTimeEntry(id: string): Promise<void>;
+
+  // Users
+  getUser(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -140,6 +148,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTimeEntry(id: string): Promise<void> {
     await db.delete(timeEntries).where(eq(timeEntries.id, id));
+  }
+
+  // Users
+  async getUser(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users).set(user).where(eq(users.id, id)).returning();
+    return updatedUser || undefined;
   }
 }
 
