@@ -173,6 +173,31 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
+  app.get("/api/users/:username", async (req, res) => {
+    try {
+      const { username } = req.params;
+      const user = await storage.getUser(username);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      return res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          dateOfBirth: user.dateOfBirth,
+          profilePicture: user.profilePicture
+        }
+      });
+    } catch (error) {
+      console.error("[GET USER] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/me", async (req, res) => {
     // Session check would go here
     res.json(null);

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, User, Mail, Upload, Calendar, Lock, X } from "lucide-react";
 import { Link } from "wouter";
+import { useAuthStore } from "@/stores/auth-store";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -45,11 +46,8 @@ export default function Profile() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const initializedRef = useRef(false);
 
-    // Initialize user directly from localStorage to avoid loading state
-    const [user, setUser] = useState<any>(() => {
-        const userStr = localStorage.getItem("user");
-        return userStr ? JSON.parse(userStr) : null;
-    });
+    const user = useAuthStore((state) => state.user);
+    const updateUser = useAuthStore((state) => state.login); // Using login to update user state
 
     const [previewImage, setPreviewImage] = useState<string>("");
 
@@ -82,7 +80,8 @@ export default function Profile() {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    username: user.username,
+                    currentUsername: user.username,
+                    username: data.fullName ? undefined : user.username, // Only send username if we want to update it (not implemented in UI yet, but good for safety)
                     ...data,
                 }),
             });
@@ -92,8 +91,9 @@ export default function Profile() {
             }
 
             const updatedUser = await res.json();
+
             localStorage.setItem("user", JSON.stringify(updatedUser.user));
-            setUser(updatedUser.user);
+            updateUser(updatedUser.user);
 
             toast({
                 title: "Success",
@@ -186,18 +186,34 @@ export default function Profile() {
     };
 
     useEffect(() => {
+        const fetchUserData = async () => {
+            if (user?.username) {
+                try {
+                    const res = await fetch(`/api/users/${user.username}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        updateUser(data.user); // Update store with fresh data
+
+                        // Update form values
+                        form.reset({
+                            fullName: data.user.fullName || "",
+                            email: data.user.email || "",
+                            dateOfBirth: data.user.dateOfBirth || "",
+                            profilePicture: data.user.profilePicture || "",
+                        });
+                        setPreviewImage(data.user.profilePicture || "");
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch user data:", error);
+                }
+            }
+        };
+
         if (user && !initializedRef.current) {
             initializedRef.current = true;
-            const profilePicture = user.profilePicture || "";
-            setPreviewImage(profilePicture);
-            form.reset({
-                fullName: user.fullName || "",
-                email: user.email || "",
-                dateOfBirth: user.dateOfBirth || "",
-                profilePicture,
-            });
+            fetchUserData();
         }
-    }, []);
+    }, [user?.username]); // Re-run if username changes (e.g. login)
 
     // if (!user) {
     //     return (

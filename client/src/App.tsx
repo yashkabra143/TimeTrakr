@@ -12,6 +12,7 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEffect } from "react";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // Protected route wrapper
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -42,9 +43,12 @@ function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 mx-auto mb-4 animate-pulse" />
-          <p className="text-muted-foreground">Loading...</p>
+        <div className="w-64 h-64">
+          <DotLottieReact
+            src="https://lottie.host/829f208f-4edd-432f-bd6b-046e24ff47a2/INl28Nn8GZ.lottie"
+            loop
+            autoplay
+          />
         </div>
       </div>
     );
