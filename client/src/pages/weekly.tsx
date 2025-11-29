@@ -57,7 +57,7 @@ export default function Weekly() {
     const minutes = Math.round((totalHours - hours) * 60);
     if (hours === 0) return `${minutes}m`;
     if (minutes === 0) return `${hours}h`;
-    return `${hours} hours ${minutes} minutes`;
+    return `${hours} hours ${minutes} mins`;
   };
 
   return (
@@ -144,7 +144,7 @@ export default function Weekly() {
                           {data.hours > 0 ? `$${data.gross.toFixed(0)}` : '-'}
                         </span>
                         <span className={cn("font-medium text-right", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
-                          {data.hours > 0 ? `${data.hours}h` : '-'}
+                          {data.hours > 0 ? formatDuration(data.hours) : '-'}
                         </span>
                       </div>
                     );
