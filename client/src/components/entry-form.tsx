@@ -54,16 +54,21 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
     if (project && watchedHours && deductions && currency) {
       const parsedHours = parseDotNotation(watchedHours);
       const gross = parsedHours * project.rate;
+
+      // Calculate deductions (matching earnings-calculator.tsx logic)
       const serviceFeePercent = deductions.serviceFee || 0;
-      const serviceAmt = gross * (serviceFeePercent / 100);
       const tdsPercent = deductions.tds || 0;
-      const tdsAmt = gross * (tdsPercent / 100);
       const gstPercent = deductions.gst || 0;
+      const transferFee = deductions.transferFee || 0;
+
+      const serviceAmt = gross * (serviceFeePercent / 100);
+      const tdsAmt = gross * (tdsPercent / 100);
       const gstAmt = serviceAmt * (gstPercent / 100);
-      const transferAmt = deductions.transferFee || 0;
-      const netBeforeTransfer = gross - serviceAmt - tdsAmt - gstAmt;
-      const netUsd = Math.max(0, netBeforeTransfer - transferAmt);
+
+      const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferFee;
+      const netUsd = Math.max(0, gross - totalDeductions);
       const netInr = netUsd * currency.usdToInr;
+
       setCalculated({ gross, netUsd, netInr });
     } else {
       setCalculated({ gross: 0, netUsd: 0, netInr: 0 });
