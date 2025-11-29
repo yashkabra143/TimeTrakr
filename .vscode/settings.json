@@ -1,0 +1,9 @@
+{
+    "builder.serverUrl": "http://127.0.0.1:3000",
+    "builder.command": "npm run dev",
+    "builder.runDevServer": true,
+    "builder.autoDetectDevServer": false,
+    "builder.launchType": "editor",
+    "builder.waitForServer": true,
+    "builder.waitTimeout": 30000
+}

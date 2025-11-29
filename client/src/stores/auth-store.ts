@@ -17,6 +17,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
 
     login: (user: User) => {
+        localStorage.setItem('user', JSON.stringify(user));
         set({ user, isAuthenticated: true });
     },
 
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
+            localStorage.removeItem('user');
             set({ user: null, isAuthenticated: false });
         }
     },
@@ -34,8 +36,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             const user = await checkAuth();
             if (user) {
+                localStorage.setItem('user', JSON.stringify(user));
                 set({ user, isAuthenticated: true });
             } else {
+                localStorage.removeItem('user');
                 set({ user: null, isAuthenticated: false });
             }
         } catch (error) {
@@ -47,11 +51,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     initialize: async () => {
         set({ isLoading: true });
         try {
+            // Try to restore from local storage first for immediate UI
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                set({ user: JSON.parse(storedUser), isAuthenticated: true });
+            }
+
             const user = await checkAuth();
             if (user) {
+                localStorage.setItem('user', JSON.stringify(user));
                 set({ user, isAuthenticated: true, isLoading: false });
             } else {
-                set({ user: null, isAuthenticated: false, isLoading: false });
+                // If checkAuth fails (e.g. session expired), clear local storage unless we want to keep it for offline mode
+                // For now, let's keep it if checkAuth returns null (not authenticated)
+                if (!storedUser) {
+                    set({ user: null, isAuthenticated: false, isLoading: false });
+                } else {
+                    // If we have stored user but checkAuth failed, we might want to keep the user logged in visually 
+                    // but they might fail API calls. 
+                    // Given the current setup without real session cookies, checkAuth returns null.
+                    // So we rely on localStorage.
+                    set({ isLoading: false });
+                }
             }
         } catch (error) {
             console.error('Auth initialization error:', error);

@@ -7,26 +7,13 @@ import {
   insertCurrencySettingsSchema,
   insertTimeEntrySchema
 } from "../shared/schema.js";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 import { z } from "zod";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import MemoryStore from "memorystore";
 
-// Simple in-memory user storage for authentication
-const users = new Map<string, { id: string; username: string; password: string }>();
+const scryptAsync = promisify(scrypt);
 
-// Initialize users with a default user if empty
-if (users.size === 0) {
-  const defaultUser = {
-    id: "user1",
-    username: "admin",
-    password: "password123",
-  };
-  users.set("admin", defaultUser);
-}
 
-const MemStore = MemoryStore(session);
 
 // Check if we're running in a serverless environment
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -34,12 +21,15 @@ const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_N
 export async function registerRoutes(app: Express): Promise<Server | null> {
   console.log("[ROUTES] Starting registration...", { isServerless });
 
-  // Minimal setup for debugging
-  // Handle root path if prefix is stripped
-  app.get("/", (_req, res) => {
-    console.log("[ROUTE] Root handler hit");
-    res.json({ status: "ok", path: "/" });
-  });
+  // In development, Vite handles the root route, so we skip it
+  // In production/serverless, static files are served separately
+  if (process.env.NODE_ENV === 'production' || isServerless) {
+    // Minimal setup for debugging in production
+    app.get("/", (_req, res) => {
+      console.log("[ROUTE] Root handler hit");
+      res.json({ status: "ok", path: "/" });
+    });
+  }
 
   // Simple ping endpoint
   app.get("/api/ping", (_req, res) => {
@@ -47,68 +37,174 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     res.json({ status: "pong", timestamp: Date.now() });
   });
 
+  // Initialize default user if none exists
+  const existingUser = await storage.getUser("admin");
+  if (!existingUser) {
+    const salt = randomBytes(16).toString("hex");
+    const hashedPassword = (await scryptAsync("password123", salt, 64)) as Buffer;
+    await storage.createUser({
+      username: "admin",
+      password: hashedPassword.toString("hex"),
+      salt,
+    });
+    console.log("[AUTH] Created default admin user");
+  }
+
   // Authentication routes
-  // Handle both /api/login and /login (in case path is transformed)
   const loginHandler = async (req: Request, res: Response) => {
     try {
-      console.log("[LOGIN] Attempting login", {
-        method: req.method,
-        path: req.path,
-        url: req.url,
-        body: req.body ? { username: req.body.username, hasPassword: !!req.body.password } : 'no body'
-      });
-      
       const { username, password } = req.body || {};
 
       if (!username || !password) {
-        console.log("[LOGIN] Missing credentials");
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      const user = users.get(username);
-      if (!user || user.password !== password) {
-        console.log("[LOGIN] Invalid credentials for:", username);
+      const user = await storage.getUser(username);
+      if (!user) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      console.log("[LOGIN] Login successful for:", username);
-      // Return user without password
-      return res.json({ 
-        user: { 
-          id: user.id, 
-          username: user.username 
-        } 
+      const hashedPassword = (await scryptAsync(password, user.salt, 64)) as Buffer;
+      if (hashedPassword.toString("hex") !== user.password) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // Return user without password/salt
+      return res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          dateOfBirth: user.dateOfBirth,
+          profilePicture: user.profilePicture
+        }
       });
     } catch (error) {
       console.error("[LOGIN] Error:", error);
-      if (!res.headersSent) {
-        return res.status(500).json({ message: "Internal server error" });
-      }
+      res.status(500).json({ message: "Internal server error" });
     }
   };
 
   app.post("/api/login", loginHandler);
-  app.post("/login", loginHandler); // Fallback in case path is transformed
+  app.post("/login", loginHandler);
 
-  app.get("/api/me", async (req, res) => {
+  app.post("/api/change-password", async (req, res) => {
     try {
-      // For now, return null - proper session-based auth would check session here
-      // This is a simple implementation that allows the client to work
-      res.json(null);
+      const { username, currentPassword, newPassword } = req.body;
+
+      if (!username || !currentPassword || !newPassword) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      const user = await storage.getUser(username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const hashedCurrent = (await scryptAsync(currentPassword, user.salt, 64)) as Buffer;
+      if (hashedCurrent.toString("hex") !== user.password) {
+        return res.status(401).json({ message: "Incorrect current password" });
+      }
+
+      // Hash new password
+      const newSalt = randomBytes(16).toString("hex");
+      const hashedNew = (await scryptAsync(newPassword, newSalt, 64)) as Buffer;
+
+      await storage.updateUser(user.id, {
+        password: hashedNew.toString("hex"),
+        salt: newSalt,
+      });
+
+      res.json({ message: "Password updated successfully" });
     } catch (error) {
-      console.error("[ME] Error:", error);
+      console.error("[CHANGE PASSWORD] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.post("/api/logout", async (req, res) => {
+  app.patch("/api/user", async (req, res) => {
     try {
-      // For now, just return success - proper session-based auth would destroy session here
-      res.json({ message: "Logged out successfully" });
+      const { currentUsername, username, email, fullName, dateOfBirth, profilePicture } = req.body;
+
+      if (!currentUsername) {
+        return res.status(400).json({ message: "Current username is required" });
+      }
+
+      const user = await storage.getUser(currentUsername);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if new username is already taken (if username is being changed)
+      if (username && username !== currentUsername) {
+        const existingUser = await storage.getUser(username);
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(user.id, {
+        username: username || currentUsername,
+        email,
+        fullName,
+        dateOfBirth,
+        profilePicture
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user" });
+      }
+
+      return res.json({
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          dateOfBirth: updatedUser.dateOfBirth,
+          profilePicture: updatedUser.profilePicture
+        }
+      });
     } catch (error) {
-      console.error("[LOGOUT] Error:", error);
+      console.error("[UPDATE USER] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  app.get("/api/users/:username", async (req, res) => {
+    try {
+      const { username } = req.params;
+      const user = await storage.getUser(username);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      return res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          dateOfBirth: user.dateOfBirth,
+          profilePicture: user.profilePicture
+        }
+      });
+    } catch (error) {
+      console.error("[GET USER] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/me", async (req, res) => {
+    // Session check would go here
+    res.json(null);
+  });
+
+  app.post("/api/logout", async (req, res) => {
+    res.json({ message: "Logged out successfully" });
   });
 
   // Projects routes
@@ -239,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.post("/api/entries", async (req, res) => {
     try {
       const baseEntry = insertTimeEntrySchema.parse(req.body);
-      
+
       // Get project to get the rate
       const project = await storage.getProject(baseEntry.projectId);
       if (!project) {
@@ -276,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       // Net calculations
       const netBeforeTransfer = grossUsd - deductionService - deductionTds - deductionGst;
       const netUsd = Math.max(0, netBeforeTransfer - deductionTransfer);
-      
+
       const exchangeRate = Number(currency.usdToInr) || 0;
       const netInr = netUsd * exchangeRate;
 
@@ -292,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         netInr,
         exchangeRate,
       };
-      
+
       const created = await storage.createTimeEntry(entry);
       res.status(201).json(created);
     } catch (error) {
@@ -317,17 +413,20 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // Catch-all - MUST be last, after all other routes
-  app.all("*", (req, res) => {
-    console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
-      method: req.method,
-      path: req.path,
-      url: req.url,
-      originalUrl: req.originalUrl
+  // In development, Vite handles non-API routes, so we only add catch-all in production/serverless
+  if (process.env.NODE_ENV === 'production' || isServerless) {
+    app.all("*", (req, res) => {
+      console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
+        method: req.method,
+        path: req.path,
+        url: req.url,
+        originalUrl: req.originalUrl
+      });
+      if (!res.headersSent) {
+        res.status(404).json({ error: "Not Found", path: req.path, method: req.method });
+      }
     });
-    if (!res.headersSent) {
-      res.status(404).json({ error: "Not Found", path: req.path, method: req.method });
-    }
-  });
+  }
 
   // Only create HTTP server for traditional deployments (not serverless)
   // In serverless environments (Vercel, AWS Lambda), the platform handles the server

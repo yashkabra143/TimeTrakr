@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject } from "@/lib/hooks";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { useEffect, useState } from "react";
 
 // Predefined color palette for projects
@@ -27,6 +28,8 @@ const PROJECT_COLORS = [
   "#6366f1", // indigo
   "#a855f7", // violet
 ];
+
+
 
 const projectSchema = z.object({
   projects: z.array(z.object({
@@ -72,6 +75,14 @@ export default function Settings() {
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
+
+  // Initialize user from localStorage
+  const [user, setUser] = useState<any>(() => {
+    const userStr = localStorage.getItem("user");
+    return userStr ? JSON.parse(userStr) : null;
+  });
+
+
 
   // New Project Form
   const newProjectForm = useForm({
@@ -123,6 +134,8 @@ export default function Settings() {
       currencyForm.reset({ usdToInr: currency.usdToInr });
     }
   }, [currency]);
+
+
 
   async function onProjectSubmit(data: z.infer<typeof projectSchema>) {
     for (const p of data.projects) {
@@ -215,10 +228,13 @@ export default function Settings() {
 
       <Tabs defaultValue="general" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
+
           <TabsTrigger value="general" className="text-xs md:text-sm">General & Projects</TabsTrigger>
           <TabsTrigger value="financials" className="text-xs md:text-sm">Financials</TabsTrigger>
           <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
         </TabsList>
+
+
 
         <TabsContent value="general" className="space-y-4 md:space-y-6">
           <Card>

@@ -47,6 +47,18 @@ export const timeEntries = pgTable("time_entries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email"),
+  fullName: text("full_name"),
+  dateOfBirth: text("date_of_birth"),
+  profilePicture: text("profile_picture"),
+  password: text("password").notNull(), // Hashed password
+  salt: text("salt").notNull(), // Salt for hashing
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
@@ -81,6 +93,11 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   }),
 });
 
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select schemas (TypeScript types)
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -93,3 +110,6 @@ export type InsertCurrencySetting = z.infer<typeof insertCurrencySettingsSchema>
 
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -1,4 +1,13 @@
+import * as React from "react";
 import { StatsCard } from "@/components/ui/stats-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Clock,
   DollarSign,
@@ -21,7 +30,6 @@ import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseIS
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 
@@ -29,6 +37,7 @@ export default function Dashboard() {
   const { data: entries = [] } = useTimeEntries();
   const { data: projects = [] } = useProjects();
   const { data: currency } = useCurrencySettings();
+  const [dateRange, setDateRange] = React.useState("week");
 
   // Helper to filter entries
   const getEntriesInDateRange = (startDate: Date, endDate: Date) => {
@@ -49,9 +58,25 @@ export default function Dashboard() {
 
   const monthStart = startOfMonth(today);
 
-  // Calculate Summaries with NaN protection
-  const calculateSummary = (filteredEntries: typeof entries) => {
-    return filteredEntries.reduce((acc, curr) => ({
+  // Determine current range interval
+  const currentInterval = React.useMemo(() => {
+    switch (dateRange) {
+      case "week": return { start: weekStart, end: weekEnd };
+      case "last_week": return { start: lastWeekStart, end: lastWeekEnd };
+      case "month": return { start: monthStart, end: today };
+      case "all": return { start: new Date(0), end: today }; // All time
+      default: return { start: weekStart, end: weekEnd };
+    }
+  }, [dateRange, today]);
+
+  // Filter entries based on selected range
+  const filteredEntries = React.useMemo(() => {
+    return getEntriesInDateRange(currentInterval.start, currentInterval.end);
+  }, [entries, currentInterval]);
+
+  // Calculate Summaries
+  const calculateSummary = (data: typeof entries) => {
+    return data.reduce((acc, curr) => ({
       hours: acc.hours + (curr.hours || 0),
       grossUsd: acc.grossUsd + (curr.grossUsd || 0),
       netUsd: acc.netUsd + (curr.netUsd || 0),
@@ -60,26 +85,53 @@ export default function Dashboard() {
     }), { hours: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 });
   };
 
-  const weekSummary = calculateSummary(getEntriesInDateRange(weekStart, weekEnd));
-  const lastWeekSummary = calculateSummary(getEntriesInDateRange(lastWeekStart, lastWeekEnd));
-  const monthSummary = calculateSummary(getEntriesInDateRange(monthStart, today));
-  const allTimeSummary = calculateSummary(entries);
+  const summary = calculateSummary(filteredEntries);
 
   // Chart Data Preparation
-  const lineChartData = Array.from({ length: 7 }).map((_, i) => {
-    const date = subDays(today, 6 - i);
-    const dateStr = format(date, 'EEE');
-    const dayEntries = entries.filter(e => e.date && format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
-    const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
-    return { name: dateStr, hours };
-  });
+  const lineChartData = React.useMemo(() => {
+    // For "All Time", show last 30 days to avoid overcrowding
+    // For others, show the specific range
+    let start = currentInterval.start;
+    let end = currentInterval.end;
+
+    // If "All Time" or range > 30 days, limit to last 30 days for the chart
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+    if (daysDiff > 31) {
+      start = subDays(end, 30);
+    }
+
+    const days = [];
+    let curr = start;
+    while (curr <= end) {
+      days.push(curr);
+      curr = new Date(curr.getTime() + 24 * 60 * 60 * 1000);
+      // Safety break
+      if (days.length > 365) break;
+    }
+
+    return days.map(date => {
+      const dateStr = format(date, 'MMM dd');
+      const dayEntries = filteredEntries.filter(e => e.date && format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+      const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+      return { name: dateStr, hours };
+    });
+  }, [filteredEntries, currentInterval]);
 
   // Project Distribution
-  const projectPieData = projects.map(p => ({
-    name: p.name,
-    value: entries.filter(e => e.projectId === p.id).reduce((acc, e) => acc + (e.hours || 0), 0),
-    color: p.color
-  })).filter(d => d.value > 0);
+  const projectPieData = React.useMemo(() => {
+    return projects.map(p => ({
+      name: p.name,
+      value: filteredEntries.filter(e => e.projectId === p.id).reduce((acc, e) => acc + (e.hours || 0), 0),
+      color: p.color
+    })).filter(d => d.value > 0);
+  }, [filteredEntries, projects]);
+
+  const rangeLabel = {
+    week: "This Week",
+    last_week: "Last Week",
+    month: "This Month",
+    all: "All Time"
+  }[dateRange];
 
   return (
     <div className="space-y-8">
@@ -88,30 +140,28 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight font-heading">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back. Here's your productivity overview.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
-                <Clock className="mr-2 h-4 w-4" />
-                Log Hours
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Quick Log</DialogTitle>
-                <DialogDescription>
-                  Add a new time entry. It will be added to your weekly summary.
-                </DialogDescription>
-              </DialogHeader>
-              <EntryForm onSuccess={() => {
-                document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
-              }} />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
+              <Clock className="mr-2 h-4 w-4" />
+              Log Hours
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Quick Log</DialogTitle>
+              <DialogDescription>
+                Add a new time entry. It will be added to your weekly summary.
+              </DialogDescription>
+            </DialogHeader>
+            <EntryForm onSuccess={() => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
+            }} />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Tabs defaultValue="week" className="space-y-4">
+      <Tabs value={dateRange} onValueChange={setDateRange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="week">This Week</TabsTrigger>
           <TabsTrigger value="last_week">Last Week</TabsTrigger>
@@ -119,111 +169,50 @@ export default function Dashboard() {
           <TabsTrigger value="all">All Time</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="week" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard
-              title="Total Hours"
-              value={(weekSummary.hours || 0).toFixed(2)}
-              subValue="Hours logged this week"
-              icon={Clock}
-            />
-            <StatsCard
-              title="Gross Earnings"
-              value={`$${(weekSummary.grossUsd || 0).toFixed(2)}`}
-              subValue="Before deductions"
-              icon={DollarSign}
-              className="value-accent"
-            />
-            <StatsCard
-              title="Net Income (USD)"
-              value={`$${(weekSummary.netUsd || 0).toFixed(2)}`}
-              subValue="After deductions"
-              icon={DollarSign}
-              className="value-success"
-            />
-            <StatsCard
-              title="Net Income (INR)"
-              value={`₹${(weekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue={`@ ₹${currency?.usdToInr || 0}/$`}
-              icon={Wallet}
-              className="value-success"
-            />
-            <StatsCard
-              title="Total Deductions"
-              value={`$${(weekSummary.deductions || 0).toFixed(2)}`}
-              subValue="Fees & Taxes"
-              icon={PieChartIcon}
-              className="value-warning"
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="last_week" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard
-              title="Total Hours"
-              value={(lastWeekSummary.hours || 0).toFixed(2)}
-              subValue="Hours logged last week"
-              icon={Clock}
-            />
-            <StatsCard
-              title="Gross Earnings"
-              value={`$${(lastWeekSummary.grossUsd || 0).toFixed(2)}`}
-              subValue="Before deductions"
-              icon={DollarSign}
-              className="value-accent"
-            />
-            <StatsCard
-              title="Net Income (USD)"
-              value={`$${(lastWeekSummary.netUsd || 0).toFixed(2)}`}
-              subValue="After deductions"
-              icon={DollarSign}
-              className="value-success"
-            />
-            <StatsCard
-              title="Net Income (INR)"
-              value={`₹${(lastWeekSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue={`@ ₹${currency?.usdToInr || 0}/$`}
-              icon={Wallet}
-              className="value-success"
-            />
-            <StatsCard
-              title="Total Deductions"
-              value={`$${(lastWeekSummary.deductions || 0).toFixed(2)}`}
-              subValue="Fees & Taxes"
-              icon={PieChartIcon}
-              className="value-warning"
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="month" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard title="Total Hours" value={(monthSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(monthSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
-            <StatsCard title="Net Income (USD)" value={`$${(monthSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
-            <StatsCard title="Net Income (INR)" value={`₹${(monthSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
-            <StatsCard title="Total Deductions" value={`$${(monthSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="all" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard title="Total Hours" value={(allTimeSummary.hours || 0).toFixed(2)} icon={Clock} />
-            <StatsCard title="Gross Earnings" value={`$${(allTimeSummary.grossUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-accent" />
-            <StatsCard title="Net Income (USD)" value={`$${(allTimeSummary.netUsd || 0).toFixed(2)}`} icon={DollarSign} className="value-success" />
-            <StatsCard title="Net Income (INR)" value={`₹${(allTimeSummary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} icon={Wallet} className="value-success" />
-            <StatsCard title="Total Deductions" value={`$${(allTimeSummary.deductions || 0).toFixed(2)}`} icon={PieChartIcon} className="value-warning" />
-          </div>
-        </TabsContent>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <StatsCard
+            title="Total Hours"
+            value={(summary.hours || 0).toFixed(2)}
+            subValue={`Hours logged ${dateRange === 'all' ? 'total' : 'this period'}`}
+            icon={Clock}
+          />
+          <StatsCard
+            title="Gross Earnings"
+            value={`$${(summary.grossUsd || 0).toFixed(2)}`}
+            subValue="Before deductions"
+            icon={DollarSign}
+            className="value-accent"
+          />
+          <StatsCard
+            title="Net Income (USD)"
+            value={`$${(summary.netUsd || 0).toFixed(2)}`}
+            subValue="After deductions"
+            icon={DollarSign}
+            className="value-success"
+          />
+          <StatsCard
+            title="Net Income (INR)"
+            value={`₹${(summary.netInr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+            subValue={`@ ₹${currency?.usdToInr || 0}/$`}
+            icon={Wallet}
+            className="value-success"
+          />
+          <StatsCard
+            title="Total Deductions"
+            value={`$${(summary.deductions || 0).toFixed(2)}`}
+            subValue="Fees & Taxes"
+            icon={PieChartIcon}
+            className="value-warning"
+          />
+        </div>
       </Tabs>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
-            <CardTitle>Weekly Activity</CardTitle>
+            <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
             <CardDescription>
-              Hours logged over the last 7 days.
+              Hours logged over the selected period.
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -260,7 +249,7 @@ export default function Dashboard() {
             ) : (
               <div className="h-80 flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
-                  <p className="text-sm">No activity this week</p>
+                  <p className="text-sm">No activity in this period</p>
                   <p className="text-xs mt-1">Log hours to see your activity here</p>
                 </div>
               </div>
@@ -270,9 +259,9 @@ export default function Dashboard() {
 
         <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
-            <CardTitle>Project Distribution</CardTitle>
+            <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
             <CardDescription>
-              Time spent across projects (All Time).
+              Time spent across projects.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -292,7 +281,7 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -310,15 +299,15 @@ export default function Dashboard() {
 
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader>
-          <CardTitle>Recent Entries</CardTitle>
+          <CardTitle>Recent Entries ({rangeLabel})</CardTitle>
           <CardDescription>
-            Your last 10 logged sessions.
+            Logged sessions in this period.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {entries.length > 0 ? (
-              entries.slice(0, 10).map((entry) => {
+            {filteredEntries.length > 0 ? (
+              filteredEntries.slice(0, 10).map((entry) => {
                 const project = projects.find(p => p.id === entry.projectId);
                 return (
                   <div key={entry.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150" data-testid={`entry-${entry.id}`}>
@@ -339,7 +328,7 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">No time entries yet</p>
+                  <p className="text-sm font-medium">No time entries in this period</p>
                   <p className="text-xs">Start logging hours to track your productivity and earnings</p>
                 </div>
               </div>
