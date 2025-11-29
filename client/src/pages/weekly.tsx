@@ -55,9 +55,9 @@ export default function Weekly() {
   const formatDuration = (totalHours: number) => {
     const hours = Math.floor(totalHours);
     const minutes = Math.round((totalHours - hours) * 60);
-    if (hours === 0) return `${minutes}m`;
-    if (minutes === 0) return `${hours}h`;
-    return `${hours} hours ${minutes} mins`;
+    if (hours === 0) return `${minutes} minutes`;
+    if (minutes === 0) return `${hours} hours`;
+    return `${hours} hours ${minutes} minutes`;
   };
 
   return (

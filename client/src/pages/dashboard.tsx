@@ -85,6 +85,15 @@ export default function Dashboard() {
     }), { hours: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 });
   };
 
+  // Helper to format duration
+  const formatDuration = (totalHours: number) => {
+    const hours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - hours) * 60);
+    if (hours === 0) return `${minutes} minutes`;
+    if (minutes === 0) return `${hours} hours`;
+    return `${hours} hours ${minutes} minutes`;
+  };
+
   const summary = calculateSummary(filteredEntries);
 
   // Chart Data Preparation
@@ -172,7 +181,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatsCard
             title="Total Hours"
-            value={(summary.hours || 0).toFixed(2)}
+            value={formatDuration(summary.hours || 0)}
             subValue={`Hours logged ${dateRange === 'all' ? 'total' : 'this period'}`}
             icon={Clock}
           />
@@ -319,7 +328,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">{entry.hours} hrs</p>
+                      <p className="font-bold">{formatDuration(entry.hours)}</p>
                       <p className="text-sm text-muted-foreground">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
                     </div>
                   </div>
