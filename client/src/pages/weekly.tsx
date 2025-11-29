@@ -22,11 +22,11 @@ export default function Weekly() {
 
   // Helper to get data for a specific project on a specific day
   const getDayData = (projectId: string, date: Date) => {
-    const dayEntries = entries.filter(e => 
-      e.projectId === projectId && 
+    const dayEntries = entries.filter(e =>
+      e.projectId === projectId &&
       isSameDay(new Date(e.date), date)
     );
-    
+
     const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
     const gross = dayEntries.reduce((acc, e) => acc + (e.grossUsd || 0), 0);
     const netUsd = dayEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0);
@@ -37,9 +37,9 @@ export default function Weekly() {
 
   // Calculate weekly totals per project
   const getProjectWeeklyTotal = (projectId: string) => {
-    const weeklyEntries = entries.filter(e => 
-      e.projectId === projectId && 
-      new Date(e.date) >= weekStart && 
+    const weeklyEntries = entries.filter(e =>
+      e.projectId === projectId &&
+      new Date(e.date) >= weekStart &&
       new Date(e.date) <= weekEnd
     );
 
@@ -49,6 +49,15 @@ export default function Weekly() {
       netUsd: weeklyEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0),
       netInr: weeklyEntries.reduce((acc, e) => acc + (e.netInr || 0), 0),
     };
+  };
+
+  // Helper to format duration
+  const formatDuration = (totalHours: number) => {
+    const hours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - hours) * 60);
+    if (hours === 0) return `${minutes}m`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours} hours ${minutes} minutes`;
   };
 
   return (
@@ -81,7 +90,7 @@ export default function Weekly() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {projects.map(project => {
           const totals = getProjectWeeklyTotal(project.id);
-          
+
           return (
             <Card key={project.id} className="border-none shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-200" data-testid={`project-card-${project.id}`}>
               <div className="h-2 w-full" style={{ backgroundColor: project.color }} />
@@ -98,7 +107,7 @@ export default function Weekly() {
                 <div className="bg-muted/30 rounded-lg p-4 space-y-2 border border-border/50">
                   <div className="flex justify-between items-baseline">
                     <span className="text-sm text-muted-foreground">Total Hours</span>
-                    <span className="text-xl font-bold">{totals.hours.toFixed(2)}h</span>
+                    <span className="text-xl font-bold">{formatDuration(totals.hours)}</span>
                   </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-sm text-muted-foreground">Gross USD</span>
