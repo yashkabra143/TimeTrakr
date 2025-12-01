@@ -365,13 +365,12 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       const deductionService = grossUsd * (serviceFeePercent / 100);
       const deductionTds = grossUsd * (tdsPercent / 100);
-      const deductionGst = (grossUsd - deductionService - deductionTds) * (gstPercent / 100);
+      const deductionGst = deductionService * (gstPercent / 100);
       const deductionTransfer = transferFee;
-      const deductionTotal = deductionService + deductionTds + deductionGst + deductionTransfer;
+      const deductionTotal = deductionService + deductionTds + deductionGst;
 
-      // Net calculations
-      const netBeforeTransfer = grossUsd - deductionService - deductionTds - deductionGst;
-      const netUsd = Math.max(0, netBeforeTransfer - deductionTransfer);
+      // Net calculations (no transfer fee in deductions)
+      const netUsd = Math.max(0, grossUsd - deductionTotal);
 
       const exchangeRate = Number(currency.usdToInr) || 0;
       const netInr = netUsd * exchangeRate;
