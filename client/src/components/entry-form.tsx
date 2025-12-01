@@ -57,7 +57,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       const tdsAmt = gross * (tdsPercent / 100);
       const gstAmt = serviceAmt * (gstPercent / 100);
 
-      const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferFee;
+      const totalDeductions = serviceAmt + tdsAmt + gstAmt;
       const netUsd = Math.max(0, gross - totalDeductions);
       const netInr = netUsd * currency.usdToInr;
 

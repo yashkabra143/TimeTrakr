@@ -51,7 +51,7 @@ export function EarningsCalculator() {
     const tdsAmt = grossUsd * (tdsPercent / 100);
     const gstAmt = serviceAmt * (gstPercent / 100);
 
-    const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferFee;
+    const totalDeductions = serviceAmt + tdsAmt + gstAmt;
     const netUsd = Math.max(0, grossUsd - totalDeductions);
 
     const exchangeRate = currency.usdToInr || 0;
