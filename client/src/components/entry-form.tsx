@@ -42,18 +42,10 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
   const watchedHours = form.watch("hours");
   const watchedProjectId = form.watch("projectId");
 
-  // Helper to parse dot notation (e.g. 2.20 -> 2.33 hours)
-  const parseDotNotation = (value: number) => {
-    const hours = Math.floor(value);
-    const minutes = Math.round((value - hours) * 100);
-    return hours + (minutes / 60);
-  };
-
   useEffect(() => {
     const project = projects.find(p => p.id === watchedProjectId);
     if (project && watchedHours && deductions && currency) {
-      const parsedHours = parseDotNotation(watchedHours);
-      const gross = parsedHours * project.rate;
+      const gross = watchedHours * project.rate;
 
       // Calculate deductions (matching earnings-calculator.tsx logic)
       const serviceFeePercent = deductions.serviceFee || 0;
@@ -77,18 +69,16 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const parsedHours = parseDotNotation(values.hours);
-
       await createEntry.mutateAsync({
         projectId: values.projectId,
-        hours: parsedHours,
+        hours: values.hours,
         date: values.date,
         description: values.description,
       });
 
       toast({
         title: "Entry Added",
-        description: `Logged ${values.hours} (${parsedHours.toFixed(2)}h) for ${projects.find(p => p.id === values.projectId)?.name}`,
+        description: `Logged ${values.hours} hours for ${projects.find(p => p.id === values.projectId)?.name}`,
       });
 
       form.reset({
@@ -153,7 +143,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                       <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.30" className="pl-9" {...field} />
                     </div>
                   </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">Format: H.MM (e.g., 1.10 = 1h 10m, 2.45 = 2h 45m)</p>
+                  <p className="text-xs text-muted-foreground mt-1">Enter hours in decimal format (e.g., 1.5 = 1h 30m, 2.25 = 2h 15m)</p>
                   <FormMessage />
                 </FormItem>
               )}
