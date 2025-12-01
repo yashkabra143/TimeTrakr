@@ -10,7 +10,8 @@ import {
   LogOut,
   ChevronDown,
   User,
-  Lock
+  Lock,
+  History
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Quick Entry", href: "/quick-entry", icon: Zap },
   { label: "Weekly Tracking", href: "/weekly", icon: Calendar },
+  { label: "History", href: "/history", icon: History },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

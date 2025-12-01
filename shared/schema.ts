@@ -59,6 +59,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const withdrawals = pgTable("Withdrawl", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  netEarnings: real("net_earnings").notNull(),
+  transactionFee: real("transaction_fee").notNull().default(0.99),
+  withdrawalAmount: real("withdrawal_amount").notNull(),
+  withdrawalDate: timestamp("withdrawal_date").notNull(),
+  paymentStatus: text("payment_status").notNull().default("pending"), // "pending" or "received"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
@@ -98,6 +109,15 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  withdrawalDate: z.coerce.date({
+    required_error: "Withdrawal date is required",
+  }),
+});
+
 // Select schemas (TypeScript types)
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -113,3 +133,6 @@ export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Withdrawal = typeof withdrawals.$inferSelect;
+export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;

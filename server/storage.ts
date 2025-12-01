@@ -4,6 +4,7 @@ import {
   currencySettings,
   timeEntries,
   users,
+  withdrawals,
   type Project,
   type InsertProject,
   type Deduction,
@@ -13,7 +14,9 @@ import {
   type TimeEntry,
   type InsertTimeEntry,
   type User,
-  type InsertUser
+  type InsertUser,
+  type Withdrawal,
+  type InsertWithdrawal
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc } from "drizzle-orm";
@@ -54,6 +57,13 @@ export interface IStorage {
   getUser(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+
+  // Withdrawals
+  getWithdrawals(): Promise<Withdrawal[]>;
+  getWithdrawal(id: string): Promise<Withdrawal | undefined>;
+  createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
+  updateWithdrawalStatus(id: string, status: string): Promise<Withdrawal | undefined>;
+  deleteWithdrawal(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -164,6 +174,33 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined> {
     const [updatedUser] = await db.update(users).set(user).where(eq(users.id, id)).returning();
     return updatedUser || undefined;
+  }
+
+  // Withdrawals
+  async getWithdrawals(): Promise<Withdrawal[]> {
+    return await db.select().from(withdrawals).orderBy(desc(withdrawals.withdrawalDate));
+  }
+
+  async getWithdrawal(id: string): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
+    return withdrawal || undefined;
+  }
+
+  async createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal> {
+    const [newWithdrawal] = await db.insert(withdrawals).values(withdrawal).returning();
+    return newWithdrawal;
+  }
+
+  async updateWithdrawalStatus(id: string, status: string): Promise<Withdrawal | undefined> {
+    const [updated] = await db.update(withdrawals)
+      .set({ paymentStatus: status })
+      .where(eq(withdrawals.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteWithdrawal(id: string): Promise<void> {
+    await db.delete(withdrawals).where(eq(withdrawals.id, id));
   }
 }
 

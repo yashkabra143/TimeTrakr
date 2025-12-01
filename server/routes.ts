@@ -5,7 +5,8 @@ import {
   insertProjectSchema,
   insertDeductionSchema,
   insertCurrencySettingsSchema,
-  insertTimeEntrySchema
+  insertTimeEntrySchema,
+  insertWithdrawalSchema
 } from "../shared/schema.js";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -407,6 +408,63 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       res.status(204).send();
     } catch (error) {
       console.error("[ENTRIES DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Withdrawal routes
+  app.get("/api/withdrawals", async (req, res) => {
+    try {
+      const withdrawals = await storage.getWithdrawals();
+      res.json(withdrawals);
+    } catch (error) {
+      console.error("[WITHDRAWALS GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/withdrawals", async (req, res) => {
+    try {
+      const validated = insertWithdrawalSchema.parse(req.body);
+      const withdrawal = await storage.createWithdrawal(validated);
+      res.status(201).json(withdrawal);
+    } catch (error) {
+      console.error("[WITHDRAWALS POST] Error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid withdrawal data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/withdrawals/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentStatus } = req.body;
+
+      if (!paymentStatus) {
+        return res.status(400).json({ message: "Payment status is required" });
+      }
+
+      const withdrawal = await storage.updateWithdrawalStatus(id, paymentStatus);
+      if (!withdrawal) {
+        return res.status(404).json({ message: "Withdrawal not found" });
+      }
+      res.json(withdrawal);
+    } catch (error) {
+      console.error("[WITHDRAWALS PATCH] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/withdrawals/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteWithdrawal(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[WITHDRAWALS DELETE] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -1,4 +1,4 @@
-import type { Project, Deduction, CurrencySetting, TimeEntry, InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry } from "@shared/schema";
+import type { Project, Deduction, CurrencySetting, TimeEntry, Withdrawal, InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry, InsertWithdrawal } from "@shared/schema";
 
 const API_URL = "/api";
 
@@ -92,4 +92,38 @@ export async function deleteTimeEntry(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) throw new Error("Failed to delete time entry");
+}
+
+// Withdrawals
+export async function getWithdrawals(): Promise<Withdrawal[]> {
+  const response = await fetch(`${API_URL}/withdrawals`);
+  if (!response.ok) throw new Error("Failed to fetch withdrawals");
+  return response.json();
+}
+
+export async function createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal> {
+  const response = await fetch(`${API_URL}/withdrawals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(withdrawal),
+  });
+  if (!response.ok) throw new Error("Failed to create withdrawal");
+  return response.json();
+}
+
+export async function updateWithdrawalStatus(id: string, status: string): Promise<Withdrawal> {
+  const response = await fetch(`${API_URL}/withdrawals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paymentStatus: status }),
+  });
+  if (!response.ok) throw new Error("Failed to update withdrawal status");
+  return response.json();
+}
+
+export async function deleteWithdrawal(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/withdrawals/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to delete withdrawal");
 }

@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import Profile from "@/pages/profile";
 import QuickEntry from "@/pages/quick-entry";
 import Weekly from "@/pages/weekly";
+import History from "@/pages/history";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
@@ -71,6 +72,9 @@ function App() {
         </Route>
         <Route path="/weekly">
           <ProtectedRoute component={Weekly} />
+        </Route>
+        <Route path="/history">
+          <ProtectedRoute component={History} />
         </Route>
         <Route path="/settings">
           <ProtectedRoute component={Settings} />

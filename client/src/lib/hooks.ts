@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
-import type { InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry } from "@shared/schema";
+import type { InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry, InsertWithdrawal } from "@shared/schema";
 
 // Projects
 export function useProjects() {
@@ -101,6 +101,44 @@ export function useDeleteTimeEntry() {
     mutationFn: (id: string) => api.deleteTimeEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+  });
+}
+
+// Withdrawals
+export function useWithdrawals() {
+  return useQuery({
+    queryKey: ["withdrawals"],
+    queryFn: api.getWithdrawals,
+  });
+}
+
+export function useCreateWithdrawal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (withdrawal: InsertWithdrawal) => api.createWithdrawal(withdrawal),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+    },
+  });
+}
+
+export function useUpdateWithdrawalStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.updateWithdrawalStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+    },
+  });
+}
+
+export function useDeleteWithdrawal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteWithdrawal(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
     },
   });
 }
