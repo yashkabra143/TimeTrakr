@@ -293,4 +293,145 @@
       0 12px 32px rgba(0, 0, 0, 0.15);
     transform: translateY(-4px);
   }
+
+  /* Recent Entries Card Styling */
+  .entry-row {
+    @apply flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150 gap-4;
+  }
+
+  .entry-indicator {
+    @apply w-2 h-12 rounded-full flex-shrink-0;
+  }
+
+  .entry-details {
+    @apply flex-1 min-w-0;
+  }
+
+  .entry-project-name {
+    @apply font-medium text-sm truncate;
+  }
+
+  .entry-meta {
+    @apply text-sm text-muted-foreground truncate;
+  }
+
+  .entry-stats {
+    @apply text-right flex-shrink-0;
+  }
+
+  .entry-hours {
+    @apply font-bold text-sm;
+  }
+
+  .entry-earnings {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .entry-empty-state {
+    @apply text-center py-12 text-muted-foreground space-y-2;
+  }
+
+  .entry-empty-title {
+    @apply text-sm font-medium;
+  }
+
+  .entry-empty-subtitle {
+    @apply text-xs;
+  }
+
+  /* Withdrawal Row Styling */
+  .withdrawal-row {
+    @apply flex items-center gap-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150 flex-wrap;
+  }
+
+  .withdrawal-content {
+    @apply flex-1 min-w-0;
+  }
+
+  .withdrawal-details {
+    @apply space-y-1;
+  }
+
+  .withdrawal-date {
+    @apply font-medium text-sm;
+  }
+
+  .withdrawal-meta {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .withdrawal-notes {
+    @apply text-xs text-muted-foreground italic;
+  }
+
+  .withdrawal-amount-status {
+    @apply text-right flex-shrink-0 min-w-max space-y-1;
+  }
+
+  .withdrawal-amount {
+    @apply text-lg font-bold text-green-600;
+  }
+
+  .withdrawal-actions {
+    @apply flex gap-2 flex-shrink-0;
+  }
+
+  /* Mobile Responsive Adjustments */
+  @media (max-width: 768px) {
+    .withdrawal-row {
+      @apply gap-2 p-3;
+    }
+
+    .withdrawal-date {
+      @apply text-xs;
+    }
+
+    .withdrawal-meta {
+      @apply text-xs;
+    }
+
+    .withdrawal-amount {
+      @apply text-base;
+    }
+
+    .withdrawal-actions {
+      @apply flex-col w-full;
+    }
+
+    .withdrawal-actions button {
+      @apply w-full;
+    }
+  }
+
+  /* Project Configuration Sections */
+  .project-section {
+    @apply space-y-4;
+  }
+
+  .project-item {
+    @apply flex items-start gap-3 p-4 rounded-lg bg-background border border-border hover:border-primary/30 transition-all duration-200;
+  }
+
+  .project-item:hover {
+    @apply bg-muted/50;
+  }
+
+  .project-name-input {
+    @apply text-sm;
+  }
+
+  .project-rate-input {
+    @apply text-sm;
+  }
+
+  @media (max-width: 768px) {
+    .project-item {
+      @apply p-3 gap-2;
+    }
+
+    .project-name-input,
+    .project-rate-input {
+      @apply text-xs;
+    }
+  }
 }
