@@ -4,6 +4,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +38,7 @@ const projectSchema = z.object({
     name: z.string().min(1, "Name is required"),
     rate: z.coerce.number().min(0, "Rate must be positive"),
     color: z.string(),
+    type: z.enum(["hourly", "fixed"]).default("hourly"),
     createdAt: z.any().optional(),
   })),
 });
@@ -45,6 +47,7 @@ const newProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   rate: z.coerce.number().min(0, "Rate must be 0 or greater"),
   color: z.string(),
+  type: z.enum(["hourly", "fixed"]).default("hourly"),
 });
 
 const deductionSchema = z.object({
@@ -91,6 +94,7 @@ export default function Settings() {
       name: "",
       rate: 0,
       color: PROJECT_COLORS[0],
+      type: "hourly" as "hourly" | "fixed",
     },
   });
 
@@ -137,9 +141,9 @@ export default function Settings() {
 
 
 
-  async function onProjectSubmit(data: z.infer<typeof projectSchema>) {
+  async function onProjectSubmit(data: any) {
     for (const p of data.projects) {
-      await updateProject.mutateAsync({ id: p.id, data: { name: p.name, rate: p.rate, color: p.color } });
+      await updateProject.mutateAsync({ id: p.id, data: { name: p.name, rate: p.rate, color: p.color, type: p.type as any } });
     }
     toast({ title: "Projects Updated", description: "Your project settings have been saved." });
   }
@@ -151,6 +155,7 @@ export default function Settings() {
         name: "",
         rate: 0,
         color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)],
+        type: "hourly" as "hourly" | "fixed",
       });
       setIsAddProjectOpen(false);
       toast({ title: "Project Created", description: `${data.name} has been added successfully.` });
@@ -275,10 +280,33 @@ export default function Settings() {
                         />
                         <FormField
                           control={newProjectForm.control}
+                          name="type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contract Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="hourly">Hourly Rate</SelectItem>
+                                  <SelectItem value="fixed">Fixed Price</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={newProjectForm.control}
                           name="rate"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Hourly Rate ($)</FormLabel>
+                              <FormLabel>
+                                {newProjectForm.watch("type") === "fixed" ? "Total Contract Budget ($)" : "Hourly Rate ($)"}
+                              </FormLabel>
                               <FormControl>
                                 <Input type="number" step="0.01" placeholder="25.00" {...field} />
                               </FormControl>
@@ -358,7 +386,9 @@ export default function Settings() {
                             name={`projects.${index}.rate`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs md:text-sm">Hourly Rate ($)</FormLabel>
+                                <FormLabel className="text-xs md:text-sm">
+                                  {projectForm.watch(`projects.${index}.type`) === "fixed" ? "Total Contract Budget ($)" : "Hourly Rate ($)"}
+                                </FormLabel>
                                 <FormControl>
                                   <Input type="number" {...field} data-testid={`input-project-rate-${index}`} className="text-sm" />
                                 </FormControl>
