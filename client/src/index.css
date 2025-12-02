@@ -434,23 +434,4 @@
       @apply text-xs;
     }
   }
-
-  /* CardNav Styling */
-  .nav-card {
-    @apply transition-all duration-300;
-  }
-
-  .nav-card:hover {
-    @apply shadow-lg;
-  }
-
-  /* Hide scrollbar while keeping functionality */
-  .scrollbar-hide::-webkit-scrollbar {
-    @apply hidden;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
 }
