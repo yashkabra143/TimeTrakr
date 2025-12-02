@@ -293,4 +293,49 @@
       0 12px 32px rgba(0, 0, 0, 0.15);
     transform: translateY(-4px);
   }
+
+  /* Recent Entries Card Styling */
+  .entry-row {
+    @apply flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150 gap-4;
+  }
+
+  .entry-indicator {
+    @apply w-2 h-12 rounded-full flex-shrink-0;
+  }
+
+  .entry-details {
+    @apply flex-1 min-w-0;
+  }
+
+  .entry-project-name {
+    @apply font-medium text-sm truncate;
+  }
+
+  .entry-meta {
+    @apply text-sm text-muted-foreground truncate;
+  }
+
+  .entry-stats {
+    @apply text-right flex-shrink-0;
+  }
+
+  .entry-hours {
+    @apply font-bold text-sm;
+  }
+
+  .entry-earnings {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .entry-empty-state {
+    @apply text-center py-12 text-muted-foreground space-y-2;
+  }
+
+  .entry-empty-title {
+    @apply text-sm font-medium;
+  }
+
+  .entry-empty-subtitle {
+    @apply text-xs;
+  }
 }
