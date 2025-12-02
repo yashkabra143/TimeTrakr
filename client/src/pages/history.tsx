@@ -331,6 +331,7 @@ export default function History() {
                                                 variant="outline"
                                                 onClick={() => handleStatusUpdate(withdrawal.id, withdrawal.paymentStatus)}
                                                 title={withdrawal.paymentStatus === "pending" ? "Mark as Received" : "Mark as Pending"}
+                                                onContextMenu={(e) => e.preventDefault()}
                                             >
                                                 <CheckCircle className="h-4 w-4" />
                                             </Button>
