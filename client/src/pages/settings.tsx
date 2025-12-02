@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Download, Upload, Trash2, Plus, RefreshCw } from "lucide-react";
+import { Save, Download, Upload, Trash2, Plus, RefreshCw, Clock, Briefcase } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -85,7 +85,9 @@ export default function Settings() {
     return userStr ? JSON.parse(userStr) : null;
   });
 
-
+  // Separate projects by type
+  const hourlyProjects = projects.filter(p => p.type === "hourly" || !p.type);
+  const fixedProjects = projects.filter(p => p.type === "fixed");
 
   // New Project Form
   const newProjectForm = useForm({
@@ -224,6 +226,126 @@ export default function Settings() {
     downloadAnchorNode.remove();
   };
 
+  const ProjectSection = ({ type, projects: sectionProjects, icon: Icon }: { type: "hourly" | "fixed", projects: any[], icon: React.ReactNode }) => {
+    const typeLabel = type === "hourly" ? "Hourly Projects" : "Fixed Price Projects";
+    const typeDescription = type === "hourly" 
+      ? "Projects billed by the hour" 
+      : "Projects with a fixed budget or total contract value";
+    const sectionColor = type === "hourly" ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900" : "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900";
+    const badgeColor = type === "hourly" ? "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100" : "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100";
+    const rateLabel = type === "hourly" ? "Hourly Rate ($)" : "Contract Budget ($)";
+
+    return (
+      <div className={`project-section rounded-xl border ${sectionColor} p-6 space-y-4`}>
+        {/* Section Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={type === "hourly" ? "text-blue-600 dark:text-blue-400" : "text-purple-600 dark:text-purple-400"}>
+              {Icon}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                {typeLabel}
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${badgeColor}`}>
+                  {sectionProjects.length}
+                </span>
+              </h3>
+              <p className="text-sm text-muted-foreground mt-0.5">{typeDescription}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Projects List */}
+        {sectionProjects.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No {type} projects yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-3 mt-6">
+            {sectionProjects.map((field, index) => {
+              const globalIndex = projects.findIndex(p => p.id === field.id);
+              return (
+                <div key={field.id} className="project-item">
+                  <div className="flex items-center gap-3">
+                    {/* Color Indicator */}
+                    <div className="w-5 h-5 rounded-full flex-shrink-0 border-2 border-white dark:border-gray-800 shadow-sm" style={{ backgroundColor: field.color }} />
+                    
+                    {/* Project Details */}
+                    <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      {/* Project Name */}
+                      <div className="md:col-span-6">
+                        <FormField
+                          control={projectForm.control}
+                          name={`projects.${globalIndex}.name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-medium">Project Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  data-testid={`input-project-name-${globalIndex}`} 
+                                  className="project-name-input"
+                                  placeholder="Enter project name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Rate/Budget */}
+                      <div className="md:col-span-4">
+                        <FormField
+                          control={projectForm.control}
+                          name={`projects.${globalIndex}.rate`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-medium">{rateLabel}</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01"
+                                    {...field} 
+                                    data-testid={`input-project-rate-${globalIndex}`} 
+                                    className="project-rate-input pl-7"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Delete Button */}
+                      <div className="md:col-span-2 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 hover:bg-red-50 dark:hover:bg-red-950 hover:text-destructive"
+                          onClick={() => setDeleteProjectId(field.id)}
+                          data-testid={`button-delete-project-${globalIndex}`}
+                          title="Delete project"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto pb-12 px-4 md:px-0">
       <div>
@@ -247,11 +369,11 @@ export default function Settings() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle className="text-lg md:text-xl">Project Configuration</CardTitle>
-                  <CardDescription className="text-xs md:text-sm mt-1">Manage your freelance projects and hourly rates.</CardDescription>
+                  <CardDescription className="text-xs md:text-sm mt-1">Manage your freelance projects and rates. Organize by hourly or fixed-price contracts.</CardDescription>
                 </div>
                 <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm">
+                    <Button size="sm" className="whitespace-nowrap">
                       <Plus className="w-4 h-4 mr-2" />
                       Add Project
                     </Button>
@@ -295,6 +417,11 @@ export default function Settings() {
                                   <SelectItem value="fixed">Fixed Price</SelectItem>
                                 </SelectContent>
                               </Select>
+                              <FormDescription>
+                                {newProjectForm.watch("type") === "hourly" 
+                                  ? "You'll be paid based on hours logged" 
+                                  : "You'll be paid a fixed amount regardless of hours"}
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -308,8 +435,16 @@ export default function Settings() {
                                 {newProjectForm.watch("type") === "fixed" ? "Total Contract Budget ($)" : "Hourly Rate ($)"}
                               </FormLabel>
                               <FormControl>
-                                <Input type="number" step="0.01" placeholder="25.00" {...field} />
+                                <div className="relative">
+                                  <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                  <Input type="number" step="0.01" className="pl-7" placeholder="25.00" {...field} />
+                                </div>
                               </FormControl>
+                              <FormDescription>
+                                {newProjectForm.watch("type") === "fixed" 
+                                  ? "Total budget for this fixed-price contract" 
+                                  : "Your hourly rate for this project"}
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -354,69 +489,37 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <Form {...projectForm}>
-                <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-4">
+                <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-6">
                   {projects.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>No projects yet. Click "Add Project" to get started.</p>
+                    <div className="text-center py-12 text-muted-foreground">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">No projects yet</p>
+                        <p className="text-xs">Click "Add Project" to create your first project.</p>
+                      </div>
                     </div>
                   ) : (
-                    projectForm.watch("projects").map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-end p-3 md:p-4 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors duration-150">
-                        <div className="flex items-center gap-3 md:col-span-1">
-                          <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: field.color }} />
-                        </div>
-                        <div className="col-span-1 md:col-span-5">
-                          <FormField
-                            control={projectForm.control}
-                            name={`projects.${index}.name`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs md:text-sm">Project Name</FormLabel>
-                                <FormControl>
-                                  <Input {...field} data-testid={`input-project-name-${index}`} className="text-sm" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="col-span-1 md:col-span-3">
-                          <FormField
-                            control={projectForm.control}
-                            name={`projects.${index}.rate`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs md:text-sm">
-                                  {projectForm.watch(`projects.${index}.type`) === "fixed" ? "Total Contract Budget ($)" : "Hourly Rate ($)"}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input type="number" {...field} data-testid={`input-project-rate-${index}`} className="text-sm" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="col-span-1 md:col-span-2 flex justify-end md:pb-0">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10"
-                            onClick={() => setDeleteProjectId(field.id)}
-                            data-testid={`button-delete-project-${index}`}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
+                    <div className="space-y-6">
+                      {/* Hourly Projects Section */}
+                      <ProjectSection 
+                        type="hourly" 
+                        projects={projectForm.watch("projects").filter(p => p.type === "hourly" || !p.type)}
+                        icon={<Clock className="w-5 h-5" />}
+                      />
+
+                      {/* Fixed Projects Section */}
+                      <ProjectSection 
+                        type="fixed" 
+                        projects={projectForm.watch("projects").filter(p => p.type === "fixed")}
+                        icon={<Briefcase className="w-5 h-5" />}
+                      />
+                    </div>
                   )}
+                  
                   {projects.length > 0 && (
-                    <div className="flex justify-end">
-                      <Button type="submit" data-testid="button-save-projects">
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Projects
+                    <div className="flex justify-end pt-6 border-t border-border">
+                      <Button type="submit" size="lg" data-testid="button-save-projects" className="gap-2">
+                        <Save className="w-4 h-4" />
+                        Save All Projects
                       </Button>
                     </div>
                   )}
