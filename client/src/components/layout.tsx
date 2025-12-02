@@ -100,22 +100,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-bold text-primary">{user?.username.charAt(0).toUpperCase()}</span>
+                      <span className="text-xs font-bold text-primary">{(user?.fullName || user?.username).charAt(0).toUpperCase()}</span>
                     </div>
-                    <span className="hidden md:inline text-sm font-medium capitalize">{user?.username}</span>
+                    <span className="hidden md:inline text-sm font-medium capitalize">{user?.fullName || user?.username}</span>
                     <ChevronDown className="w-4 h-4 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none capitalize">{user?.fullName || user?.username}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email || "No email set"}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/profile" className="cursor-pointer">
                       <User className="mr-2 h-4 w-4" />
