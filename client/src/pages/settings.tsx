@@ -314,7 +314,9 @@ export default function Settings() {
                           <Button type="button" variant="outline" onClick={() => setIsAddProjectOpen(false)}>
                             Cancel
                           </Button>
-                          <Button type="submit">Create Project</Button>
+                          <Button type="submit" disabled={createProject.isPending}>
+                            {createProject.isPending ? "Creating..." : "Create Project"}
+                          </Button>
                         </DialogFooter>
                       </form>
                     </Form>

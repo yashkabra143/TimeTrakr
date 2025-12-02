@@ -8,6 +8,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   rate: real("rate").notNull(),
   color: text("color").notNull(),
+  type: text("type").notNull().default("hourly"), // "hourly" or "fixed"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -102,6 +103,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   date: z.coerce.date({
     required_error: "Date is required",
   }),
+  manualGrossAmount: z.number().optional(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

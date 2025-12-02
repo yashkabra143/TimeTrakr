@@ -98,7 +98,7 @@ export default function Weekly() {
                 <CardTitle className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-base md:text-lg">
                   <span>{project.name}</span>
                   <span className="text-xs md:text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full w-fit">
-                    ${project.rate}/hr
+                    {project.type === "fixed" ? "Fixed Price" : `$${project.rate}/hr`}
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -106,8 +106,15 @@ export default function Weekly() {
                 {/* Weekly Summary Card */}
                 <div className="bg-muted/30 rounded-lg p-4 space-y-2 border border-border/50">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Total Hours</span>
-                    <span className="text-xl font-bold">{formatDuration(totals.hours)}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {project.type === "fixed" ? "Milestones" : "Total Hours"}
+                    </span>
+                    <span className="text-xl font-bold">
+                      {project.type === "fixed"
+                        ? `${entries.filter(e => e.projectId === project.id && new Date(e.date) >= weekStart && new Date(e.date) <= weekEnd).length} Submitted`
+                        : formatDuration(totals.hours)
+                      }
+                    </span>
                   </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-sm text-muted-foreground">Gross USD</span>
@@ -144,7 +151,12 @@ export default function Weekly() {
                           {data.hours > 0 ? `$${data.gross.toFixed(0)}` : '-'}
                         </span>
                         <span className={cn("font-medium text-right", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
-                          {data.hours > 0 ? formatDuration(data.hours) : '-'}
+                          {data.hours > 0
+                            ? (project.type === "fixed"
+                              ? `$${data.gross.toFixed(0)}`
+                              : formatDuration(data.hours))
+                            : '-'
+                          }
                         </span>
                       </div>
                     );

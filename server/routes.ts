@@ -354,9 +354,19 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       }
 
       // Calculate fields based on project rate and deductions
+      // Calculate fields based on project rate and deductions
       const hours = Number(baseEntry.hours);
       const rate = Number(project.rate);
-      const grossUsd = hours * rate;
+
+      let grossUsd = 0;
+      if (project.type === "fixed") {
+        // For fixed projects, use the manual amount passed from frontend
+        // If not passed, fallback to rate (assuming rate might be the fixed price)
+        grossUsd = Number(baseEntry.manualGrossAmount) || rate;
+      } else {
+        // Hourly calculation
+        grossUsd = hours * rate;
+      }
 
       // Deductions - stored as percentages (e.g., 10 means 10%)
       const serviceFeePercent = Number(deductions.serviceFee) || 0;

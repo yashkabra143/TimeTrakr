@@ -11,11 +11,12 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 import { useEffect, useState } from "react";
-import { useProjects, useDeductions, useCurrencySettings, useCreateTimeEntry } from "@/lib/hooks";
+import { useProjects, useDeductions, useCurrencySettings, useCreateTimeEntry, useTimeEntries } from "@/lib/hooks";
 
 const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
-  hours: z.coerce.number().min(0.01, "Hours must be at least 0.01 (1 min)"),
+  hours: z.coerce.number().min(0, "Hours must be positive"),
+  amount: z.coerce.number().optional(),
   date: z.date({
     required_error: "A date of entry is required.",
   }),
@@ -26,28 +27,51 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
   const { data: projects = [] } = useProjects();
   const { data: deductions } = useDeductions();
   const { data: currency } = useCurrencySettings();
+  const { data: entries = [] } = useTimeEntries();
   const createEntry = useCreateTimeEntry();
   const { toast } = useToast();
   const [calculated, setCalculated] = useState({ gross: 0, netUsd: 0, netInr: 0 });
+  const [remainingBudget, setRemainingBudget] = useState(0);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       hours: 0,
+      amount: 0,
       date: new Date(),
       description: "",
     },
   });
 
   const watchedHours = form.watch("hours");
+  const watchedAmount = form.watch("amount");
   const watchedProjectId = form.watch("projectId");
 
   useEffect(() => {
     const project = projects.find(p => p.id === watchedProjectId);
-    if (project && watchedHours && deductions && currency) {
-      const gross = watchedHours * project.rate;
+    if (project && deductions && currency) {
+      let gross = 0;
 
-      // Calculate deductions (matching earnings-calculator.tsx logic)
+      if (project.type === "fixed") {
+        // Calculate remaining budget
+        const projectEntries = entries.filter(e => e.projectId === project.id);
+        const paidAmount = projectEntries.reduce((sum, e) => sum + (e.grossUsd || 0), 0);
+        const remaining = Math.max(0, project.rate - paidAmount);
+        setRemainingBudget(remaining);
+
+        // If amount is 0 (default) or undefined, pre-fill with remaining budget
+        // Only if watchedAmount is falsy to avoid overwriting user input
+        if (!watchedAmount) {
+          // Optional: pre-fill logic could go here, but let's leave it empty or set to remaining
+          // form.setValue("amount", remaining); 
+        }
+
+        gross = watchedAmount || 0;
+      } else {
+        gross = (watchedHours || 0) * project.rate;
+      }
+
+      // Calculate deductions
       const serviceFeePercent = deductions.serviceFee || 0;
       const tdsPercent = deductions.tds || 0;
       const gstPercent = deductions.gst || 0;
@@ -65,25 +89,50 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
     } else {
       setCalculated({ gross: 0, netUsd: 0, netInr: 0 });
     }
-  }, [watchedHours, watchedProjectId, projects, deductions, currency]);
+  }, [watchedHours, watchedAmount, watchedProjectId, projects, deductions, currency, entries]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      const project = projects.find(p => p.id === values.projectId);
+      if (!project) return;
+
+      const isFixed = project.type === "fixed";
+
+      // Validate budget for fixed projects
+      if (isFixed && values.amount) {
+        const projectEntries = entries.filter(e => e.projectId === project.id);
+        const paidAmount = projectEntries.reduce((sum, e) => sum + (e.grossUsd || 0), 0);
+        const remaining = Math.max(0, project.rate - paidAmount);
+
+        if (values.amount > remaining) {
+          toast({
+            title: "Budget Exceeded",
+            description: `Milestone amount ($${values.amount}) exceeds remaining budget ($${remaining.toFixed(2)}). Please enter an amount ≤ $${remaining.toFixed(2)}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       await createEntry.mutateAsync({
         projectId: values.projectId,
-        hours: values.hours,
+        hours: isFixed ? 1 : values.hours,
+        manualGrossAmount: isFixed ? values.amount : undefined,
         date: values.date,
         description: values.description,
       });
 
       toast({
-        title: "Entry Added",
-        description: `Logged ${values.hours} hours for ${projects.find(p => p.id === values.projectId)?.name}`,
+        title: isFixed ? "Milestone Submitted" : "Entry Added",
+        description: isFixed
+          ? `Submitted milestone of $${values.amount} for ${project.name}`
+          : `Logged ${values.hours} hours for ${project.name}`,
       });
 
       form.reset({
         projectId: values.projectId,
         hours: 0,
+        amount: 0,
         date: new Date(),
         description: "",
       });
@@ -97,6 +146,9 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       });
     }
   }
+
+  const selectedProject = projects.find(p => p.id === watchedProjectId);
+  const isFixedProject = selectedProject?.type === "fixed";
 
   return (
     <Form {...form}>
@@ -120,7 +172,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                         <SelectItem key={project.id} value={project.id}>
                           <span className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
-                            {project.name} (${project.rate}/hr)
+                            {project.name} {project.type === "fixed" ? "(Fixed)" : `($${project.rate}/hr)`}
                           </span>
                         </SelectItem>
                       ))}
@@ -131,30 +183,75 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="hours"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Hours Worked</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.30" className="pl-9" {...field} />
-                    </div>
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">Enter hours in decimal format (e.g., 1.5 = 1h 30m, 2.25 = 2h 15m)</p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {isFixedProject && selectedProject ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg border border-border/50">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Budget</p>
+                    <p className="text-lg font-semibold">${selectedProject.rate.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
+                    <p className={`text-lg font-semibold ${remainingBudget < 0 ? "text-destructive" : "text-green-600"}`}>
+                      ${remainingBudget.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Milestone Amount ($)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="100.00"
+                            className="pl-7"
+                            max={remainingBudget > 0 ? remainingBudget : undefined}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
+                          />
+                        </div>
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Maximum: ${remainingBudget.toFixed(2)}
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            ) : (
+              <FormField
+                control={form.control}
+                name="hours"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hours Worked</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.30" className="pl-9" {...field} />
+                      </div>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">Enter hours in decimal format (e.g., 1.5 = 1h 30m, 2.25 = 2h 15m)</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
               name="date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date</FormLabel>
+                  <FormLabel>{isFixedProject ? "Submission Date" : "Date"}</FormLabel>
                   <FormControl>
                     <div className="relative cursor-pointer">
                       <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -180,9 +277,9 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>{isFixedProject ? "Milestone Name / Description" : "Description (Optional)"}</FormLabel>
                   <FormControl>
-                    <Input data-testid="input-description" placeholder="What did you work on?" {...field} />
+                    <Input data-testid="input-description" placeholder={isFixedProject ? "e.g. Frontend Implementation" : "What did you work on?"} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -211,10 +308,10 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
         </div>
 
         <Button type="submit" data-testid="button-submit" className="w-full h-12 text-base" size="lg" disabled={createEntry.isPending}>
-          {createEntry.isPending ? "Logging..." : "Log Time Entry"}
+          {createEntry.isPending ? "Logging..." : (isFixedProject ? "Submit Milestone" : "Log Time Entry")}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </form>
-    </Form>
+    </Form >
   );
 }
