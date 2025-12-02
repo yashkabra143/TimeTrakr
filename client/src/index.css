@@ -338,4 +338,68 @@
   .entry-empty-subtitle {
     @apply text-xs;
   }
+
+  /* Withdrawal Row Styling */
+  .withdrawal-row {
+    @apply flex items-center gap-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors duration-150 flex-wrap;
+  }
+
+  .withdrawal-content {
+    @apply flex-1 min-w-0;
+  }
+
+  .withdrawal-details {
+    @apply space-y-1;
+  }
+
+  .withdrawal-date {
+    @apply font-medium text-sm;
+  }
+
+  .withdrawal-meta {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .withdrawal-notes {
+    @apply text-xs text-muted-foreground italic;
+  }
+
+  .withdrawal-amount-status {
+    @apply text-right flex-shrink-0 min-w-max space-y-1;
+  }
+
+  .withdrawal-amount {
+    @apply text-lg font-bold text-green-600;
+  }
+
+  .withdrawal-actions {
+    @apply flex gap-2 flex-shrink-0;
+  }
+
+  /* Mobile Responsive Adjustments */
+  @media (max-width: 768px) {
+    .withdrawal-row {
+      @apply gap-2 p-3;
+    }
+
+    .withdrawal-date {
+      @apply text-xs;
+    }
+
+    .withdrawal-meta {
+      @apply text-xs;
+    }
+
+    .withdrawal-amount {
+      @apply text-base;
+    }
+
+    .withdrawal-actions {
+      @apply flex-col w-full;
+    }
+
+    .withdrawal-actions button {
+      @apply w-full;
+    }
+  }
 }
