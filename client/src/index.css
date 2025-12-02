@@ -402,4 +402,36 @@
       @apply w-full;
     }
   }
+
+  /* Project Configuration Sections */
+  .project-section {
+    @apply space-y-4;
+  }
+
+  .project-item {
+    @apply flex items-start gap-3 p-4 rounded-lg bg-background border border-border hover:border-primary/30 transition-all duration-200;
+  }
+
+  .project-item:hover {
+    @apply bg-muted/50;
+  }
+
+  .project-name-input {
+    @apply text-sm;
+  }
+
+  .project-rate-input {
+    @apply text-sm;
+  }
+
+  @media (max-width: 768px) {
+    .project-item {
+      @apply p-3 gap-2;
+    }
+
+    .project-name-input,
+    .project-rate-input {
+      @apply text-xs;
+    }
+  }
 }
