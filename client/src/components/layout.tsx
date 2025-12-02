@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EarningsCalculator } from "@/components/earnings-calculator";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import Galaxy from "@/components/galaxy";
 
 
 const NAV_ITEMS = [
