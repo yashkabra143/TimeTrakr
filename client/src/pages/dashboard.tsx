@@ -144,45 +144,30 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="galaxy-hero-section">
-        <div className="galaxy-background">
-          <Galaxy
-            mouseInteraction={true}
-            density={1.2}
-            glowIntensity={0.5}
-            saturation={0.7}
-            hueShift={220}
-            rotationSpeed={0.01}
-            transparent={true}
-          />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back. Here's your productivity overview.</p>
         </div>
-        <div className="galaxy-content">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight font-heading">Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back. Here's your productivity overview.</p>
-            </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
-                  <Clock className="mr-2 h-4 w-4" />
-                  Log Hours
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Quick Log</DialogTitle>
-                  <DialogDescription>
-                    Add a new time entry. It will be added to your weekly summary.
-                  </DialogDescription>
-                </DialogHeader>
-                <EntryForm onSuccess={() => {
-                  document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
-                }} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="lg" className="shadow-lg shadow-primary/20" data-testid="button-log-hours">
+              <Clock className="mr-2 h-4 w-4" />
+              Log Hours
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Quick Log</DialogTitle>
+              <DialogDescription>
+                Add a new time entry. It will be added to your weekly summary.
+              </DialogDescription>
+            </DialogHeader>
+            <EntryForm onSuccess={() => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape' }));
+            }} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs value={dateRange} onValueChange={setDateRange} className="space-y-4">
