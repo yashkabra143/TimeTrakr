@@ -74,14 +74,20 @@ export default function Login() {
 
       <div className="relative min-h-screen flex">
         {/* Left Side - Illustration & Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/95 to-primary/85 items-center justify-center p-12 relative overflow-hidden" style={{
-          backgroundImage: `linear-gradient(135deg, rgba(91, 78, 255, 0.95) 0%, rgba(91, 78, 255, 0.85) 100%)`
-        }}>
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 items-center justify-center p-12 relative overflow-hidden">
           {/* Animated Background Pattern */}
           <div className="absolute inset-0">
-            <div className="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-2xl transform -rotate-45 animate-pulse"></div>
-            <div className="absolute bottom-20 right-20 w-32 h-32 bg-white/5 rounded-full animate-bounce" style={{ animationDelay: "0.5s" }}></div>
-            <div className="absolute top-1/2 left-1/4 w-24 h-24 border-2 border-white/10 rounded-full transform -rotate-12 animate-pulse" style={{ animationDelay: "1s" }}></div>
+            <div className="absolute top-0 left-0 w-full h-full opacity-30" style={{
+              backgroundImage: `
+                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.1) 0%, transparent 50%)
+              `
+            }}></div>
+            <div className="absolute top-10 left-10 w-20 h-20 bg-green-200/30 rounded-2xl transform -rotate-45 animate-pulse"></div>
+            <div className="absolute bottom-20 right-20 w-32 h-32 bg-emerald-200/20 rounded-full animate-bounce" style={{ animationDelay: "0.5s" }}></div>
+            <div className="absolute top-1/2 left-1/4 w-24 h-24 border-2 border-green-300/30 rounded-full transform -rotate-12 animate-pulse" style={{ animationDelay: "1s" }}></div>
+            <div className="absolute top-1/4 right-1/4 w-40 h-40 rounded-full bg-gradient-to-br from-teal-300/20 to-emerald-300/10 blur-2xl"></div>
           </div>
 
           {/* Illustration SVG */}
