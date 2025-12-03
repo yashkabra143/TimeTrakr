@@ -141,8 +141,8 @@ export default function Login() {
 
           {/* Text Content */}
           <div className="absolute bottom-10 left-0 right-0 text-center z-10">
-            <h2 className="text-white text-2xl font-heading font-bold mb-2">Time Tracking Made Simple</h2>
-            <p className="text-white/80 text-sm">Track your hours, manage earnings, and boost productivity</p>
+            <h2 className="text-emerald-900 text-2xl font-heading font-bold mb-2">Time Tracking Made Simple</h2>
+            <p className="text-emerald-700 text-sm">Track your hours, manage earnings, and boost productivity</p>
           </div>
         </div>
 
