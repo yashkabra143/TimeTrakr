@@ -74,14 +74,20 @@ export default function Login() {
 
       <div className="relative min-h-screen flex">
         {/* Left Side - Illustration & Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/95 to-primary/85 items-center justify-center p-12 relative overflow-hidden" style={{
-          backgroundImage: `linear-gradient(135deg, rgba(91, 78, 255, 0.95) 0%, rgba(91, 78, 255, 0.85) 100%)`
-        }}>
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 items-center justify-center p-12 relative overflow-hidden">
           {/* Animated Background Pattern */}
           <div className="absolute inset-0">
-            <div className="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-2xl transform -rotate-45 animate-pulse"></div>
-            <div className="absolute bottom-20 right-20 w-32 h-32 bg-white/5 rounded-full animate-bounce" style={{ animationDelay: "0.5s" }}></div>
-            <div className="absolute top-1/2 left-1/4 w-24 h-24 border-2 border-white/10 rounded-full transform -rotate-12 animate-pulse" style={{ animationDelay: "1s" }}></div>
+            <div className="absolute top-0 left-0 w-full h-full opacity-30" style={{
+              backgroundImage: `
+                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.1) 0%, transparent 50%)
+              `
+            }}></div>
+            <div className="absolute top-10 left-10 w-20 h-20 bg-green-200/30 rounded-2xl transform -rotate-45 animate-pulse"></div>
+            <div className="absolute bottom-20 right-20 w-32 h-32 bg-emerald-200/20 rounded-full animate-bounce" style={{ animationDelay: "0.5s" }}></div>
+            <div className="absolute top-1/2 left-1/4 w-24 h-24 border-2 border-green-300/30 rounded-full transform -rotate-12 animate-pulse" style={{ animationDelay: "1s" }}></div>
+            <div className="absolute top-1/4 right-1/4 w-40 h-40 rounded-full bg-gradient-to-br from-teal-300/20 to-emerald-300/10 blur-2xl"></div>
           </div>
 
           {/* Illustration SVG */}
@@ -90,53 +96,53 @@ export default function Login() {
               {/* Hourglass Illustration */}
               <defs>
                 <linearGradient id="glassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.3" />
                 </linearGradient>
               </defs>
 
               {/* Sand particles animation concept */}
-              <circle cx="200" cy="200" r="180" fill="none" stroke="white" strokeWidth="0.5" opacity="0.1" />
-              <circle cx="200" cy="200" r="140" fill="none" stroke="white" strokeWidth="0.5" opacity="0.15" />
+              <circle cx="200" cy="200" r="180" fill="none" stroke="#10b981" strokeWidth="0.5" opacity="0.1" />
+              <circle cx="200" cy="200" r="140" fill="none" stroke="#10b981" strokeWidth="0.5" opacity="0.15" />
 
               {/* Hourglass top bulb */}
-              <ellipse cx="200" cy="120" rx="50" ry="55" fill="url(#glassGradient)" stroke="white" strokeWidth="2" />
+              <ellipse cx="200" cy="120" rx="50" ry="55" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" />
               {/* Hourglass bottom bulb */}
-              <ellipse cx="200" cy="280" rx="50" ry="55" fill="url(#glassGradient)" stroke="white" strokeWidth="2" opacity="0.6" />
+              <ellipse cx="200" cy="280" rx="50" ry="55" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" opacity="0.6" />
 
               {/* Connecting tube */}
-              <rect x="190" y="160" width="20" height="80" fill="url(#glassGradient)" stroke="white" strokeWidth="2" />
+              <rect x="190" y="160" width="20" height="80" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" />
 
               {/* Sand particles flowing */}
               <g className="animate-pulse">
-                <rect x="185" y="165" width="4" height="4" fill="white" opacity="0.8" />
-                <rect x="195" y="170" width="4" height="4" fill="white" opacity="0.6" />
-                <rect x="190" y="180" width="4" height="4" fill="white" opacity="0.7" />
-                <rect x="200" y="185" width="4" height="4" fill="white" opacity="0.5" />
-                <rect x="185" y="200" width="4" height="4" fill="white" opacity="0.8" />
+                <rect x="185" y="165" width="4" height="4" fill="#10b981" opacity="0.8" />
+                <rect x="195" y="170" width="4" height="4" fill="#10b981" opacity="0.6" />
+                <rect x="190" y="180" width="4" height="4" fill="#10b981" opacity="0.7" />
+                <rect x="200" y="185" width="4" height="4" fill="#10b981" opacity="0.5" />
+                <rect x="185" y="200" width="4" height="4" fill="#10b981" opacity="0.8" />
               </g>
 
               {/* Frame ornament */}
-              <circle cx="160" cy="200" r="3" fill="white" opacity="0.4" />
-              <circle cx="240" cy="200" r="3" fill="white" opacity="0.4" />
+              <circle cx="160" cy="200" r="3" fill="#10b981" opacity="0.4" />
+              <circle cx="240" cy="200" r="3" fill="#10b981" opacity="0.4" />
             </svg>
 
             {/* Floating Cards */}
-            <div className="absolute -bottom-20 -left-10 bg-white/10 backdrop-blur-md rounded-2xl p-4 w-40 shadow-xl transform hover:scale-105 transition-transform duration-300 animate-float" style={{ animationDelay: "1s" }}>
-              <p className="text-white text-xs font-semibold">Track Hours</p>
-              <p className="text-white/70 text-xs">Monitor your productivity</p>
+            <div className="absolute -bottom-20 -left-10 bg-white/60 backdrop-blur-md rounded-2xl p-4 w-40 shadow-lg transform hover:scale-105 transition-transform duration-300 animate-float border border-emerald-200/50" style={{ animationDelay: "1s" }}>
+              <p className="text-emerald-900 text-xs font-semibold">Track Hours</p>
+              <p className="text-emerald-700 text-xs">Monitor your productivity</p>
             </div>
 
-            <div className="absolute top-32 -right-5 bg-white/10 backdrop-blur-md rounded-2xl p-4 w-40 shadow-xl transform hover:scale-105 transition-transform duration-300 animate-float" style={{ animationDelay: "0.5s" }}>
-              <p className="text-white text-xs font-semibold">Earnings</p>
-              <p className="text-white/70 text-xs">Calculate income instantly</p>
+            <div className="absolute top-32 -right-5 bg-white/60 backdrop-blur-md rounded-2xl p-4 w-40 shadow-lg transform hover:scale-105 transition-transform duration-300 animate-float border border-teal-200/50" style={{ animationDelay: "0.5s" }}>
+              <p className="text-teal-900 text-xs font-semibold">Earnings</p>
+              <p className="text-teal-700 text-xs">Calculate income instantly</p>
             </div>
           </div>
 
           {/* Text Content */}
           <div className="absolute bottom-10 left-0 right-0 text-center z-10">
-            <h2 className="text-white text-2xl font-heading font-bold mb-2">Time Tracking Made Simple</h2>
-            <p className="text-white/80 text-sm">Track your hours, manage earnings, and boost productivity</p>
+            <h2 className="text-emerald-900 text-2xl font-heading font-bold mb-2">Time Tracking Made Simple</h2>
+            <p className="text-emerald-700 text-sm">Track your hours, manage earnings, and boost productivity</p>
           </div>
         </div>
 
