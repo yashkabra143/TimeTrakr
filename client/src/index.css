@@ -434,33 +434,4 @@
       @apply text-xs;
     }
   }
-
-  /* Galaxy Hero Section */
-  .galaxy-hero-section {
-    @apply relative w-full overflow-hidden rounded-lg border border-border shadow-lg;
-    height: 300px;
-  }
-
-  .galaxy-background {
-    @apply absolute inset-0 w-full h-full;
-  }
-
-  .galaxy-content {
-    @apply relative z-10 h-full w-full flex items-center justify-center p-6 md:p-8;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 100%);
-  }
-
-  .dark .galaxy-content {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 100%);
-  }
-
-  @media (max-width: 768px) {
-    .galaxy-hero-section {
-      height: 250px;
-    }
-
-    .galaxy-content {
-      @apply p-4;
-    }
-  }
 }
