@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
+import Galaxy from "@/components/galaxy";
 
 export default function Dashboard() {
   const { data: entries = [] } = useTimeEntries();
