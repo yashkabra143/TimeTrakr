@@ -1,4 +1,5 @@
 import * as React from "react";
+import { motion } from "framer-motion";
 import { StatsCard } from "@/components/ui/stats-card";
 import {
   Dialog,
