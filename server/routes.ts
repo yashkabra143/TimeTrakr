@@ -8,6 +8,7 @@ import {
   insertTimeEntrySchema,
   insertWithdrawalSchema
 } from "../shared/schema.js";
+import { minutesToHoursDecimal, parseTimeInput } from "../shared/time.js";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { z } from "zod";
@@ -337,6 +338,31 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     try {
       const baseEntry = insertTimeEntrySchema.parse(req.body);
 
+      const minutesProvided = typeof baseEntry.minutes !== "undefined";
+      const parsedTime = minutesProvided
+        ? {
+          minutes: baseEntry.minutes,
+          usedLegacyFractional: false,
+          hadOverflow: false,
+          source: baseEntry.minutes ?? 0,
+          format: baseEntry.inputFormat ?? "hm",
+        }
+        : parseTimeInput(
+          baseEntry.hours ?? 0,
+          { format: baseEntry.inputFormat, allowLegacyInference: true }
+        );
+
+      if (parsedTime.usedLegacyFractional) {
+        console.warn("[ENTRIES POST] Legacy fractional hours received", {
+          projectId: baseEntry.projectId,
+          rawInput: parsedTime.source,
+        });
+      }
+
+      const minutes = parsedTime.minutes ?? 0;
+      const inputFormat = baseEntry.inputFormat || (parsedTime.usedLegacyFractional ? "fractional" : "hm");
+      const hoursDecimal = minutesToHoursDecimal(minutes);
+
       // Get project to get the rate
       const project = await storage.getProject(baseEntry.projectId);
       if (!project) {
@@ -355,7 +381,6 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       // Calculate fields based on project rate and deductions
       // Calculate fields based on project rate and deductions
-      const hours = Number(baseEntry.hours);
       const rate = Number(project.rate);
 
       let grossUsd = 0;
@@ -365,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         grossUsd = Number(baseEntry.manualGrossAmount) || rate;
       } else {
         // Hourly calculation
-        grossUsd = hours * rate;
+        grossUsd = hoursDecimal * rate;
       }
 
       // Deductions - stored as percentages (e.g., 10 means 10%)
@@ -378,16 +403,20 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       const deductionTds = grossUsd * (tdsPercent / 100);
       const deductionGst = deductionService * (gstPercent / 100);
       const deductionTransfer = transferFee;
-      const deductionTotal = deductionService + deductionTds + deductionGst;
+      const deductionTotal = deductionService + deductionTds + deductionGst + deductionTransfer;
 
-      // Net calculations (no transfer fee in deductions)
+      // Net calculations (includes transfer fee in deductions)
       const netUsd = Math.max(0, grossUsd - deductionTotal);
 
       const exchangeRate = Number(currency.usdToInr) || 0;
       const netInr = netUsd * exchangeRate;
 
+      const { hours: _legacyHours, manualGrossAmount: _manualGross, ...cleanEntry } = baseEntry;
       const entry = {
-        ...baseEntry,
+        ...cleanEntry,
+        minutes,
+        inputFormat,
+        rawInput: baseEntry.rawInput ?? String(parsedTime.source ?? ""),
         grossUsd,
         deductionService,
         deductionGst,

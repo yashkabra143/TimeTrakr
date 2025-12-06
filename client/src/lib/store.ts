@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { parseTimeInput, minutesToHoursDecimal } from "@shared/time";
 
 export interface Project {
   id: string;
@@ -23,7 +24,9 @@ export interface CurrencySettings {
 export interface TimeEntry {
   id: string;
   projectId: string;
-  hours: number;
+  minutes: number;
+  inputFormat?: "hm" | "fractional";
+  rawInput?: string;
   date: string; // ISO string
   description?: string;
   
@@ -92,8 +95,25 @@ export const useStore = create<AppState>()(
           return;
         }
 
-        // Ensure hours and rate are valid numbers
-        const hours = Number(entryData.hours) || 0;
+        // Parse time input to minutes
+        let minutes = 0;
+        if (typeof entryData.minutes !== "undefined") {
+          minutes = Number(entryData.minutes) || 0;
+        } else if (typeof entryData.hours !== "undefined") {
+          // Parse hours as H.MM format (matching frontend behavior)
+          // If inputFormat is provided, use it; otherwise default to H.MM format
+          const inputFormat = entryData.inputFormat || "hm";
+          try {
+            const parsed = parseTimeInput(entryData.hours, { format: inputFormat });
+            minutes = parsed.minutes;
+          } catch (err) {
+            console.error("[STORE] Failed to parse hours, treating as fractional", err);
+            // Fallback: treat as fractional hours (legacy)
+            minutes = Math.round(Number(entryData.hours) * 60);
+          }
+        }
+        
+        const hours = minutesToHoursDecimal(minutes);
         const rate = Number(project.rate) || 0;
 
         // 1. Gross Amount = Hours * Rate
@@ -128,7 +148,8 @@ export const useStore = create<AppState>()(
         const newEntry: TimeEntry = {
           id: crypto.randomUUID(),
           ...entryData,
-          hours, // ensure number
+          minutes,
+          inputFormat: entryData.inputFormat ?? "hm",
           grossUsd,
           deductions: {
             service: serviceAmt,

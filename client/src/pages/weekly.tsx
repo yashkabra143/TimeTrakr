@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
+import { formatMinutesReadable, minutesToHoursDecimal } from "@shared/time";
 
 export default function Weekly() {
   const { data: entries = [] } = useTimeEntries();
@@ -27,12 +28,12 @@ export default function Weekly() {
       isSameDay(new Date(e.date), date)
     );
 
-    const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+    const minutes = dayEntries.reduce((acc, e) => acc + (e.minutes || 0), 0);
     const gross = dayEntries.reduce((acc, e) => acc + (e.grossUsd || 0), 0);
     const netUsd = dayEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0);
     const netInr = dayEntries.reduce((acc, e) => acc + (e.netInr || 0), 0);
 
-    return { hours, gross, netUsd, netInr };
+    return { minutes, gross, netUsd, netInr };
   };
 
   // Calculate weekly totals per project
@@ -44,7 +45,7 @@ export default function Weekly() {
     );
 
     return {
-      hours: weeklyEntries.reduce((acc, e) => acc + (e.hours || 0), 0),
+      minutes: weeklyEntries.reduce((acc, e) => acc + (e.minutes || 0), 0),
       gross: weeklyEntries.reduce((acc, e) => acc + (e.grossUsd || 0), 0),
       netUsd: weeklyEntries.reduce((acc, e) => acc + (e.netUsd || 0), 0),
       netInr: weeklyEntries.reduce((acc, e) => acc + (e.netInr || 0), 0),
@@ -52,13 +53,7 @@ export default function Weekly() {
   };
 
   // Helper to format duration
-  const formatDuration = (totalHours: number) => {
-    const hours = Math.floor(totalHours);
-    const minutes = Math.round((totalHours - hours) * 60);
-    if (hours === 0) return `${minutes} minutes`;
-    if (minutes === 0) return `${hours} hours`;
-    return `${hours} hours ${minutes} minutes`;
-  };
+  const formatDuration = (totalMinutes: number) => formatMinutesReadable(totalMinutes);
 
   return (
     <div className="space-y-6 md:space-y-8 px-4 md:px-0">
@@ -112,7 +107,7 @@ export default function Weekly() {
                     <span className="text-xl font-bold">
                       {project.type === "fixed"
                         ? `${entries.filter(e => e.projectId === project.id && new Date(e.date) >= weekStart && new Date(e.date) <= weekEnd).length} Submitted`
-                        : formatDuration(totals.hours)
+                        : formatDuration(totals.minutes)
                       }
                     </span>
                   </div>
@@ -142,19 +137,19 @@ export default function Weekly() {
                         key={day.toISOString()}
                         className={cn(
                           "flex items-center justify-between p-2.5 md:p-3 rounded text-sm transition-colors duration-150",
-                          data.hours > 0 ? "bg-primary/5 hover:bg-primary/10" : "text-muted-foreground hover:bg-muted/50",
+                          data.minutes > 0 ? "bg-primary/5 hover:bg-primary/10" : "text-muted-foreground hover:bg-muted/50",
                           isToday && "ring-1 ring-primary ring-inset"
                         )}
                       >
                         <span className={cn("w-8 md:w-10 font-medium", isToday && "text-primary")}>{format(day, "EEE")}</span>
                         <span className="flex-1 text-center text-xs md:text-sm text-muted-foreground">
-                          {data.hours > 0 ? `$${data.gross.toFixed(0)}` : '-'}
+                          {data.minutes > 0 ? `$${data.gross.toFixed(0)}` : '-'}
                         </span>
-                        <span className={cn("font-medium text-right", data.hours > 0 ? "text-foreground" : "text-muted-foreground/50")}>
-                          {data.hours > 0
+                        <span className={cn("font-medium text-right", data.minutes > 0 ? "text-foreground" : "text-muted-foreground/50")}>
+                          {data.minutes > 0
                             ? (project.type === "fixed"
                               ? `$${data.gross.toFixed(0)}`
-                              : formatDuration(data.hours))
+                              : formatDuration(data.minutes))
                             : '-'
                           }
                         </span>

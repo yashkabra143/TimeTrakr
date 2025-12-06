@@ -12,6 +12,7 @@ import { format } from "date-fns";
 
 import { useEffect, useState } from "react";
 import { useProjects, useDeductions, useCurrencySettings, useCreateTimeEntry, useTimeEntries } from "@/lib/hooks";
+import { formatMinutesReadable, minutesToHoursDecimal, parseTimeInput } from "@shared/time";
 
 const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
@@ -59,16 +60,21 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
         const remaining = Math.max(0, project.rate - paidAmount);
         setRemainingBudget(remaining);
 
-        // If amount is 0 (default) or undefined, pre-fill with remaining budget
-        // Only if watchedAmount is falsy to avoid overwriting user input
         if (!watchedAmount) {
-          // Optional: pre-fill logic could go here, but let's leave it empty or set to remaining
-          // form.setValue("amount", remaining); 
+          // Leave empty to avoid overwriting user input
         }
 
         gross = watchedAmount || 0;
       } else {
-        gross = (watchedHours || 0) * project.rate;
+        try {
+          // Parse as H.MM format (matching UI help text)
+          const parsed = parseTimeInput(watchedHours ?? 0, { format: "hm" });
+          const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
+          gross = hoursDecimal * project.rate;
+        } catch (err) {
+          console.error("[ENTRY FORM] Failed to parse hours", err);
+          gross = 0;
+        }
       }
 
       // Calculate deductions
@@ -97,6 +103,8 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       if (!project) return;
 
       const isFixed = project.type === "fixed";
+      let parsedMinutes = 0;
+      let parsedFormat: "hm" | "fractional" = "hm";
 
       // Validate budget for fixed projects
       if (isFixed && values.amount) {
@@ -114,9 +122,28 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
         }
       }
 
+      if (!isFixed) {
+        try {
+          // Parse as H.MM format (matching UI help text)
+          const parsed = parseTimeInput(values.hours ?? 0, { format: "hm" });
+          parsedMinutes = parsed.minutes;
+          parsedFormat = "hm";
+        } catch (err) {
+          toast({
+            title: "Invalid time",
+            description: "Please enter time as H.MM (e.g., 1.50 for 1h 50m).",
+            variant: "destructive",
+          });
+          console.error("[ENTRY FORM] Parse error", err);
+          return;
+        }
+      }
+
       await createEntry.mutateAsync({
         projectId: values.projectId,
-        hours: isFixed ? 1 : values.hours,
+        minutes: isFixed ? 0 : parsedMinutes,
+        inputFormat: parsedFormat,
+        rawInput: values.hours,
         manualGrossAmount: isFixed ? values.amount : undefined,
         date: values.date,
         description: values.description,
@@ -126,7 +153,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
         title: isFixed ? "Milestone Submitted" : "Entry Added",
         description: isFixed
           ? `Submitted milestone of $${values.amount} for ${project.name}`
-          : `Logged ${values.hours} hours for ${project.name}`,
+          : `Logged ${formatMinutesReadable(parsedMinutes)} for ${project.name}`,
       });
 
       form.reset({
@@ -236,10 +263,10 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                     <FormControl>
                       <div className="relative">
                         <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.30" className="pl-9" {...field} />
+                        <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.50" className="pl-9" {...field} />
                       </div>
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Enter hours in decimal format (e.g., 1.5 = 1h 30m, 2.25 = 2h 15m)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter time as H.MM (minutes after the decimal). Example: 1.5 = 1h 50m, 2.25 = 2h 25m.</p>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -3,6 +3,7 @@ import { Clock, TrendingUp, DollarSign, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
+import { minutesToHoursDecimal } from "@shared/time";
 
 export function DashboardHeader() {
   const { data: entries = [] } = useTimeEntries();
@@ -21,18 +22,20 @@ export function DashboardHeader() {
   const todayStats = todayEntries.reduce((acc, entry) => {
     const project = projects.find(p => p.id === entry.projectId);
     if (project) {
-      const gross = (entry.hours || 0) * project.rate;
+      const hoursDecimal = minutesToHoursDecimal(entry.minutes || 0);
+      const gross = hoursDecimal * project.rate;
       return {
-        hours: acc.hours + (entry.hours || 0),
+        minutes: acc.minutes + (entry.minutes || 0),
         gross: acc.gross + gross,
         net: acc.net + (entry.netUsd || 0),
       };
     }
     return acc;
-  }, { hours: 0, gross: 0, net: 0 });
+  }, { minutes: 0, gross: 0, net: 0 });
 
   // Calculate averages
-  const avgHourlyRate = todayStats.hours > 0 ? (todayStats.gross / todayStats.hours).toFixed(2) : 0;
+  const totalHours = minutesToHoursDecimal(todayStats.minutes || 0);
+  const avgHourlyRate = totalHours > 0 ? (todayStats.gross / totalHours).toFixed(2) : 0;
   const netInr = todayStats.net * (currency?.usdToInr || 0);
 
   // Get time greeting
@@ -64,7 +67,7 @@ export function DashboardHeader() {
                   Today's Hours
                 </p>
                 <p className="text-2xl md:text-3xl font-bold font-heading count-up">
-                  {todayStats.hours.toFixed(1)}h
+                  {totalHours.toFixed(1)}h
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {todayEntries.length} {todayEntries.length === 1 ? "entry" : "entries"}

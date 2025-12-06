@@ -20,6 +20,7 @@ import {
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc } from "drizzle-orm";
+import { neon } from '@neondatabase/serverless';
 
 export interface IStorage {
   // Projects
@@ -133,7 +134,43 @@ export class DatabaseStorage implements IStorage {
 
   // Time Entries
   async getTimeEntries(): Promise<TimeEntry[]> {
-    return await db.select().from(timeEntries).orderBy(desc(timeEntries.date));
+    try {
+      // Try the new schema first
+      return await db.select().from(timeEntries).orderBy(desc(timeEntries.date));
+    } catch (error: any) {
+      // If minutes column doesn't exist, use raw SQL to handle migration
+      if (error?.message?.includes('column "minutes" does not exist') || error?.code === '42703') {
+        console.warn('[STORAGE] Detected old schema, using migration-compatible query');
+        if (!process.env.DATABASE_URL) {
+          throw new Error('DATABASE_URL is required for migration-compatible queries');
+        }
+        const rawSql = neon(process.env.DATABASE_URL);
+        const result = await rawSql`
+          SELECT 
+            id,
+            project_id as "projectId",
+            COALESCE(minutes, ROUND(COALESCE(hours, 0) * 60))::integer as minutes,
+            COALESCE(input_format, 'fractional') as "inputFormat",
+            COALESCE(raw_input, hours::text) as "rawInput",
+            date,
+            description,
+            gross_usd as "grossUsd",
+            deduction_service as "deductionService",
+            deduction_gst as "deductionGst",
+            deduction_tds as "deductionTds",
+            deduction_transfer as "deductionTransfer",
+            deduction_total as "deductionTotal",
+            net_usd as "netUsd",
+            net_inr as "netInr",
+            exchange_rate as "exchangeRate",
+            created_at as "createdAt"
+          FROM time_entries
+          ORDER BY date DESC
+        `;
+        return result as TimeEntry[];
+      }
+      throw error;
+    }
   }
 
   async getTimeEntry(id: string): Promise<TimeEntry | undefined> {

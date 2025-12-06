@@ -28,8 +28,9 @@ import {
 } from "recharts";
 import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseISO, subDays, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntryForm } from "@/components/entry-form";
+import { formatMinutesReadable, minutesToHoursDecimal } from "@shared/time";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 
@@ -77,22 +78,16 @@ export default function Dashboard() {
   // Calculate Summaries
   const calculateSummary = (data: typeof entries) => {
     return data.reduce((acc, curr) => ({
-      hours: acc.hours + (curr.hours || 0),
+      minutes: acc.minutes + (curr.minutes || 0),
       grossUsd: acc.grossUsd + (curr.grossUsd || 0),
       netUsd: acc.netUsd + (curr.netUsd || 0),
       netInr: acc.netInr + (curr.netInr || 0),
       deductions: acc.deductions + (curr.deductionTotal || 0)
-    }), { hours: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 });
+    }), { minutes: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 });
   };
 
   // Helper to format duration
-  const formatDuration = (totalHours: number) => {
-    const hours = Math.floor(totalHours);
-    const minutes = Math.round((totalHours - hours) * 60);
-    if (hours === 0) return `${minutes} minutes`;
-    if (minutes === 0) return `${hours} hours`;
-    return `${hours} hours ${minutes} minutes`;
-  };
+  const formatDuration = (totalMinutes: number) => formatMinutesReadable(totalMinutes);
 
   const summary = calculateSummary(filteredEntries);
 
@@ -121,8 +116,9 @@ export default function Dashboard() {
     return days.map(date => {
       const dateStr = format(date, 'MMM dd');
       const dayEntries = filteredEntries.filter(e => e.date && format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
-      const hours = dayEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
-      return { name: dateStr, hours };
+      const minutes = dayEntries.reduce((acc, e) => acc + (e.minutes || 0), 0);
+      const hours = minutesToHoursDecimal(minutes);
+      return { name: dateStr, hours, minutes };
     });
   }, [filteredEntries, currentInterval]);
 
@@ -130,7 +126,9 @@ export default function Dashboard() {
   const projectPieData = React.useMemo(() => {
     return projects.map(p => ({
       name: p.name,
-      value: filteredEntries.filter(e => e.projectId === p.id).reduce((acc, e) => acc + (e.hours || 0), 0),
+      value: filteredEntries
+        .filter(e => e.projectId === p.id)
+        .reduce((acc, e) => acc + minutesToHoursDecimal(e.minutes || 0), 0),
       color: p.color
     })).filter(d => d.value > 0);
   }, [filteredEntries, projects]);
@@ -181,7 +179,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatsCard
             title="Total Hours"
-            value={formatDuration(summary.hours || 0)}
+            value={formatDuration(summary.minutes || 0)}
             subValue={`Hours logged ${dateRange === 'all' ? 'total' : 'this period'}`}
             icon={Clock}
           />
@@ -326,7 +324,7 @@ export default function Dashboard() {
                       <p className="entry-meta">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
                     </div>
                     <div className="entry-stats">
-                      <p className="entry-hours">{formatDuration(entry.hours)}</p>
+                      <p className="entry-hours">{formatDuration(entry.minutes)}</p>
                       <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
                     </div>
                   </div>

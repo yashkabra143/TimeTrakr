@@ -20,10 +20,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useProjects, useDeductions, useCurrencySettings } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { parseTimeInput, minutesToHoursDecimal, formatMinutesReadable } from "@shared/time";
 
 export function EarningsCalculator() {
   const [open, setOpen] = useState(false);
-  const [hours, setHours] = useState("");
+  const [timeInput, setTimeInput] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   const { data: projects = [] } = useProjects();
@@ -33,13 +34,20 @@ export function EarningsCalculator() {
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   const calculateEarnings = () => {
-    if (!hours || !selectedProject || !deductions || !currency) return null;
+    if (!timeInput || !selectedProject || !deductions || !currency) return null;
 
-    const hoursNum = parseFloat(hours);
-    if (isNaN(hoursNum) || hoursNum < 0) return null;
+    // Parse time input as H.MM format (matching UI help text)
+    let parsedTime;
+    try {
+      parsedTime = parseTimeInput(timeInput, { format: "hm" });
+    } catch (err) {
+      return null;
+    }
 
+    const minutes = parsedTime.minutes;
+    const hoursDecimal = minutesToHoursDecimal(minutes);
     const rate = selectedProject.rate;
-    const grossUsd = hoursNum * rate;
+    const grossUsd = hoursDecimal * rate;
 
     // Calculate deductions
     const serviceFeePercent = deductions.serviceFee || 0;
@@ -50,8 +58,10 @@ export function EarningsCalculator() {
     const serviceAmt = grossUsd * (serviceFeePercent / 100);
     const tdsAmt = grossUsd * (tdsPercent / 100);
     const gstAmt = serviceAmt * (gstPercent / 100);
+    const transferAmt = transferFee;
 
-    const totalDeductions = serviceAmt + tdsAmt + gstAmt;
+    // Include transfer fee in total deductions (matching server calculation)
+    const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferAmt;
     const netUsd = Math.max(0, grossUsd - totalDeductions);
 
     const exchangeRate = currency.usdToInr || 0;
@@ -59,7 +69,9 @@ export function EarningsCalculator() {
     const netInr = netUsd * exchangeRate;
 
     return {
-      hoursNum,
+      minutes,
+      hoursDecimal,
+      timeDisplay: formatMinutesReadable(minutes),
       rate,
       grossUsd,
       grossInr,
@@ -69,7 +81,7 @@ export function EarningsCalculator() {
         serviceFee: serviceAmt,
         tds: tdsAmt,
         gst: gstAmt,
-        transfer: transferFee,
+        transfer: transferAmt,
         total: totalDeductions,
       },
       exchangeRate,
@@ -104,17 +116,20 @@ export function EarningsCalculator() {
             {/* Input Section */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="hours">Hours</Label>
+                <Label htmlFor="time-input">Time (H.MM format)</Label>
                 <Input
-                  id="hours"
+                  id="time-input"
                   type="number"
-                  placeholder="Enter hours"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
+                  placeholder="8.20"
+                  value={timeInput}
+                  onChange={(e) => setTimeInput(e.target.value)}
                   min="0"
-                  step="0.5"
+                  step="0.01"
                   className="text-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter time as H.MM (minutes after decimal). Example: 8.20 = 8h 20m, 1.5 = 1h 50m
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -137,6 +152,12 @@ export function EarningsCalculator() {
             {/* Results Section */}
             {result && (
               <div className="space-y-4 pt-6 border-t border-border">
+                {/* Time Display */}
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Time Entered</p>
+                  <p className="text-lg font-semibold">{result.timeDisplay}</p>
+                </div>
+
                 {/* Gross Earnings */}
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="bg-accent/50">
@@ -169,12 +190,10 @@ export function EarningsCalculator() {
                       <span>GST ({deductions?.gst}%)</span>
                       <span className="font-medium">${result.deductions.gst.toFixed(2)}</span>
                     </div>
-                    {result.deductions.transfer > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span>Transfer Fee</span>
-                        <span className="font-medium">${result.deductions.transfer.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Transfer Fee</span>
+                      <span className="font-medium">${result.deductions.transfer.toFixed(2)}</span>
+                    </div>
                     <div className="border-t border-border pt-2 mt-2 flex justify-between items-center text-sm font-semibold">
                       <span>Total Deductions</span>
                       <span>${result.deductions.total.toFixed(2)}</span>
@@ -212,7 +231,7 @@ export function EarningsCalculator() {
             {/* Empty State */}
             {!result && (
               <div className="py-8 text-center text-muted-foreground">
-                <p className="text-sm">Enter hours and select a project to see calculations</p>
+                <p className="text-sm">Enter time (H.MM format) and select a project to see calculations</p>
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -30,7 +30,9 @@ export const currencySettings = pgTable("currency_settings", {
 export const timeEntries = pgTable("time_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  hours: real("hours").notNull(),
+  minutes: integer("minutes").notNull(),
+  inputFormat: text("input_format").notNull().default("hm"),
+  rawInput: text("raw_input"),
   date: timestamp("date").notNull(),
   description: text("description"),
 
@@ -89,6 +91,8 @@ export const insertCurrencySettingsSchema = createInsertSchema(currencySettings)
 
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   id: true,
+  inputFormat: true,
+  rawInput: true,
   grossUsd: true,
   deductionService: true,
   deductionGst: true,
@@ -100,10 +104,22 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   exchangeRate: true,
   createdAt: true,
 }).extend({
+  minutes: z.number().int().min(0).optional(),
+  hours: z.number().min(0).optional(), // Legacy fractional input
+  inputFormat: z.enum(["hm", "fractional"]).optional(),
+  rawInput: z.union([z.string(), z.number()]).optional(),
   date: z.coerce.date({
     required_error: "Date is required",
   }),
   manualGrossAmount: z.number().optional(),
+}).superRefine((data, ctx) => {
+  if (typeof data.minutes === "undefined" && typeof data.hours === "undefined") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide minutes or hours",
+      path: ["minutes"],
+    });
+  }
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

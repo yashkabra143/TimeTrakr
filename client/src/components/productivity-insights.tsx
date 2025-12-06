@@ -4,6 +4,7 @@ import { TrendingUp, Zap, Target, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { minutesToHoursDecimal } from "@shared/time";
 
 export function ProductivityInsights() {
   const { data: entries = [] } = useTimeEntries();
@@ -42,20 +43,20 @@ export function ProductivityInsights() {
     const topProject = projects.find(p => p.id === topProjectId);
 
     // Find most productive day
-    const dayHours: { [key: string]: number } = {};
+    const dayMinutes: { [key: string]: number } = {};
     weeklyEntries.forEach(entry => {
       const date = new Date(entry.date || "");
       const dayKey = format(date, "EEEE");
-      dayHours[dayKey] = (dayHours[dayKey] || 0) + (entry.hours || 0);
+      dayMinutes[dayKey] = (dayMinutes[dayKey] || 0) + (entry.minutes || 0);
     });
 
-    const topDayName = Object.keys(dayHours).reduce((a, b) =>
-      dayHours[a] > dayHours[b] ? a : b, Object.keys(dayHours)[0]
+    const topDayName = Object.keys(dayMinutes).reduce((a, b) =>
+      dayMinutes[a] > dayMinutes[b] ? a : b, Object.keys(dayMinutes)[0]
     );
-    const topDayHours = dayHours[topDayName] || 0;
+    const topDayHours = minutesToHoursDecimal(dayMinutes[topDayName] || 0);
 
     // Calculate averages
-    const totalWeeklyHours = weeklyEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
+    const totalWeeklyHours = minutesToHoursDecimal(weeklyEntries.reduce((sum, e) => sum + (e.minutes || 0), 0));
     const totalWeeklyEarnings = weeklyEntries.reduce((sum, e) => sum + (e.netUsd || 0), 0);
     const averageDailyHours = totalWeeklyHours / 7;
     const averageDailyEarnings = totalWeeklyEarnings / 7;
