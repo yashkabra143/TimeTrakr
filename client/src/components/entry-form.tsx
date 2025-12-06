@@ -68,9 +68,14 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       } else {
         try {
           // Parse as H.MM format (matching UI help text)
-          const parsed = parseTimeInput(watchedHours ?? 0, { format: "hm" });
-          const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
-          gross = hoursDecimal * project.rate;
+          const hoursValue = watchedHours ?? 0;
+          if (typeof hoursValue === "number" && !Number.isNaN(hoursValue) && hoursValue > 0) {
+            const parsed = parseTimeInput(hoursValue, { format: "hm" });
+            const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
+            gross = hoursDecimal * project.rate;
+          } else {
+            gross = 0;
+          }
         } catch (err) {
           console.error("[ENTRY FORM] Failed to parse hours", err);
           gross = 0;
