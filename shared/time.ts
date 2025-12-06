@@ -49,8 +49,9 @@ const parseHm = (value: number | string) => {
 };
 
 const parseFractional = (value: number | string) => {
-  const numeric = typeof value === "number" ? value : parseFloat(String(value));
-  if (Number.isNaN(numeric)) throw new Error("Invalid time input");
+  const asString = String(value).trim();
+  const numeric = typeof value === "number" ? value : parseFloat(asString);
+  if (Number.isNaN(numeric) || numeric < 0) throw new Error("Invalid time input");
   return {
     minutes: normalizeMinutes(numeric * 60),
     hadOverflow: false,
