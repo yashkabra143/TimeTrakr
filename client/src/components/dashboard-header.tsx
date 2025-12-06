@@ -62,92 +62,136 @@ export function DashboardHeader() {
       {/* Today's Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Hours Card */}
-        <Card className="card-elevated group hover:bg-card/80 transition-all">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Today's Hours
-                </p>
-                <p className="text-2xl md:text-3xl font-bold font-heading count-up">
-                  {totalHours.toFixed(1)}h
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {todayEntries.length} {todayEntries.length === 1 ? "entry" : "entries"}
-                </p>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={0}
+        >
+          <Card className="card-elevated group hover:bg-card/80 transition-all">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Today's Hours
+                  </p>
+                  <p className="text-2xl md:text-3xl font-bold font-heading">
+                    <AnimatedCounter
+                      value={totalHours}
+                      duration={1.5}
+                      format={(v) => `${v.toFixed(1)}h`}
+                    />
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {todayEntries.length} {todayEntries.length === 1 ? "entry" : "entries"}
+                  </p>
+                </div>
+                <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                  <Clock className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                </div>
               </div>
-              <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                <Clock className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Gross Earnings Card */}
-        <Card className="card-elevated group hover:bg-card/80 transition-all">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Gross Earnings
-                </p>
-                <p className="text-2xl md:text-3xl font-bold font-heading count-up text-warning">
-                  ${todayStats.gross.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  @ ${avgHourlyRate}/hr
-                </p>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={1}
+        >
+          <Card className="card-elevated group hover:bg-card/80 transition-all">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Gross Earnings
+                  </p>
+                  <p className="text-2xl md:text-3xl font-bold font-heading text-warning">
+                    <AnimatedCounter
+                      value={todayStats.gross}
+                      duration={1.5}
+                      format={(v) => `$${v.toFixed(2)}`}
+                    />
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    @ ${avgHourlyRate}/hr
+                  </p>
+                </div>
+                <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
+                  <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-warning" />
+                </div>
               </div>
-              <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
-                <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Net Earnings Card */}
-        <Card className="card-elevated group hover:bg-card/80 transition-all">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Net Earnings (USD)
-                </p>
-                <p className="text-2xl md:text-3xl font-bold font-heading count-up text-success">
-                  ${todayStats.net.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  After deductions
-                </p>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={2}
+        >
+          <Card className="card-elevated group hover:bg-card/80 transition-all">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Net Earnings (USD)
+                  </p>
+                  <p className="text-2xl md:text-3xl font-bold font-heading text-success">
+                    <AnimatedCounter
+                      value={todayStats.net}
+                      duration={1.5}
+                      format={(v) => `$${v.toFixed(2)}`}
+                    />
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    After deductions
+                  </p>
+                </div>
+                <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
+                  <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-success" />
+                </div>
               </div>
-              <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
-                <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-success" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Net Earnings INR Card */}
-        <Card className="card-elevated group hover:bg-card/80 transition-all">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Net Earnings (INR)
-                </p>
-                <p className="text-2xl md:text-3xl font-bold font-heading count-up text-success">
-                  ₹{netInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  @ ₹{currency?.usdToInr || 0}/$
-                </p>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={3}
+        >
+          <Card className="card-elevated group hover:bg-card/80 transition-all">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Net Earnings (INR)
+                  </p>
+                  <p className="text-2xl md:text-3xl font-bold font-heading text-success">
+                    <AnimatedCounter
+                      value={netInr}
+                      duration={1.5}
+                      format={(v) => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+                    />
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    @ ₹{currency?.usdToInr || 0}/$
+                  </p>
+                </div>
+                <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
+                  <Zap className="w-5 h-5 md:w-6 md:h-6 text-success" />
+                </div>
               </div>
-              <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
-                <Zap className="w-5 h-5 md:w-6 md:h-6 text-success" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );
