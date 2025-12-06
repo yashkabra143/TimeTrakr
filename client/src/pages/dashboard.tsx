@@ -308,41 +308,43 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle>Recent Entries ({rangeLabel})</CardTitle>
-          <CardDescription>
-            Logged sessions in this period.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {filteredEntries.length > 0 ? (
-              filteredEntries.slice(0, 10).map((entry) => {
-                const project = projects.find(p => p.id === entry.projectId);
-                return (
-                  <div key={entry.id} className="entry-row" data-testid={`entry-${entry.id}`}>
-                    <div className="entry-indicator" style={{ backgroundColor: project?.color || 'gray' }} />
-                    <div className="entry-details">
-                      <p className="entry-project-name">{project?.name || 'Unknown Project'}</p>
-                      <p className="entry-meta">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
-                    </div>
-                    <div className="entry-stats">
-                      <p className="entry-hours">{formatDuration(entry.minutes)}</p>
-                      <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="entry-empty-state">
-                <p className="entry-empty-title">No time entries in this period</p>
-                <p className="entry-empty-subtitle">Start logging hours to track your productivity and earnings</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <motion.div variants={chartVariants} initial="hidden" animate="visible">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle>Recent Entries ({rangeLabel})</CardTitle>
+            <CardDescription>
+              Logged sessions in this period.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <motion.div className="space-y-3" variants={containerVariants} initial="hidden" animate="visible">
+              {filteredEntries.length > 0 ? (
+                filteredEntries.slice(0, 10).map((entry) => {
+                  const project = projects.find(p => p.id === entry.projectId);
+                  return (
+                    <AnimatedListItem key={entry.id} className="entry-row" data-testid={`entry-${entry.id}`}>
+                      <div className="entry-indicator" style={{ backgroundColor: project?.color || 'gray' }} />
+                      <div className="entry-details">
+                        <p className="entry-project-name">{project?.name || 'Unknown Project'}</p>
+                        <p className="entry-meta">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+                      </div>
+                      <div className="entry-stats">
+                        <p className="entry-hours">{formatDuration(entry.minutes)}</p>
+                        <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
+                      </div>
+                    </AnimatedListItem>
+                  )
+                })
+              ) : (
+                <AnimatedEmptyState
+                  title="No time entries in this period"
+                  description="Start logging hours to track your productivity and earnings"
+                />
+              )}
+            </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
