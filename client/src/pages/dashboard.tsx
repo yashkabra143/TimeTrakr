@@ -268,44 +268,44 @@ export default function Dashboard() {
           </Card>
         </motion.div>
 
-        <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader>
-            <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
-            <CardDescription>
-              Time spent across projects.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {projectPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={projectPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {projectPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-80 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm">No projects tracked</p>
-                  <p className="text-xs mt-1">Create a project and log hours to get started</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-3">
+          <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
+              <CardDescription>
+                Time spent across projects.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <PieChart>
+                    <Pie
+                      data={projectPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {projectPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => value.toFixed(2)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <AnimatedEmptyState
+                  title="No projects tracked"
+                  description="Create a project and log hours to get started"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
