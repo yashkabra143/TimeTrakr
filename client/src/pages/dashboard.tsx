@@ -34,6 +34,9 @@ import { EntryForm } from "@/components/entry-form";
 import { formatMinutesReadable, minutesToHoursDecimal } from "@shared/time";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
+import { chartVariants, containerVariants, listItemVariants, emptyStateVariants } from "@/lib/animations";
+import { AnimatedEmptyState } from "@/components/animated-empty-state";
+import { AnimatedListItem } from "@/components/animated-list";
 
 export default function Dashboard() {
   const { data: entries = [] } = useTimeEntries();
