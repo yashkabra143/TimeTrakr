@@ -29,6 +29,7 @@ import {
 import { EarningsCalculator } from "@/components/earnings-calculator";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import Galaxy from "@/components/galaxy";
+import { pageVariants } from "@/lib/animations";
 
 
 const NAV_ITEMS = [
