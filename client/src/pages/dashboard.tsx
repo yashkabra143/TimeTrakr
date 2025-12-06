@@ -219,54 +219,54 @@ export default function Dashboard() {
       </Tabs>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader>
-            <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
-            <CardDescription>
-              Hours logged over the selected period.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            {lineChartData.some(d => d.hours > 0) ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={lineChartData}>
-                  <XAxis
-                    dataKey="name"
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}h`}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="hours"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "hsl(var(--primary))" }}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-80 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm">No activity in this period</p>
-                  <p className="text-xs mt-1">Log hours to see your activity here</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-4">
+          <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
+              <CardDescription>
+                Hours logged over the selected period.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+              {lineChartData.some(d => d.hours > 0) ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={lineChartData}>
+                    <XAxis
+                      dataKey="name"
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${value}h`}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="hours"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <AnimatedEmptyState
+                  title="No activity in this period"
+                  description="Log hours to see your activity here"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
