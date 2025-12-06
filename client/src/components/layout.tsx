@@ -1,4 +1,5 @@
 import { useLocation, Link } from "wouter";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
