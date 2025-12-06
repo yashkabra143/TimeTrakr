@@ -29,10 +29,12 @@ export const formatMinutesReadable = (minutes: number) => {
 };
 
 const parseHm = (value: number | string) => {
-  const numeric = typeof value === "number" ? value : parseFloat(String(value));
-  if (Number.isNaN(numeric)) throw new Error("Invalid time input");
+  const asString = String(value).trim();
+  const numeric = typeof value === "number" ? value : parseFloat(asString);
 
-  const asString = String(value);
+  if (Number.isNaN(numeric) || numeric < 0) {
+    throw new Error("Invalid time input");
+  }
   const [hoursPart, minutesPartRaw = ""] = asString.split(".");
   const hours = Number.parseInt(hoursPart || "0", 10) || 0;
 
@@ -119,4 +121,3 @@ export const parseTimeInput = (
     source: value,
   };
 };
-
