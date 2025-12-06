@@ -1,9 +1,12 @@
 import { format } from "date-fns";
 import { Clock, TrendingUp, DollarSign, Zap } from "lucide-react";
+import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 import { minutesToHoursDecimal } from "@shared/time";
+import { cardVariants } from "@/lib/animations";
+import { AnimatedCounter } from "@/components/animated-counter";
 
 export function DashboardHeader() {
   const { data: entries = [] } = useTimeEntries();
