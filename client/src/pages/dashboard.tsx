@@ -1,4 +1,5 @@
 import * as React from "react";
+import { motion } from "framer-motion";
 import { StatsCard } from "@/components/ui/stats-card";
 import {
   Dialog,
@@ -33,6 +34,9 @@ import { EntryForm } from "@/components/entry-form";
 import { formatMinutesReadable, minutesToHoursDecimal } from "@shared/time";
 import { Button } from "@/components/ui/button";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
+import { chartVariants, containerVariants, listItemVariants, emptyStateVariants } from "@/lib/animations";
+import { AnimatedEmptyState } from "@/components/animated-empty-state";
+import { AnimatedListItem } from "@/components/animated-list";
 
 export default function Dashboard() {
   const { data: entries = [] } = useTimeEntries();
@@ -215,130 +219,132 @@ export default function Dashboard() {
       </Tabs>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader>
-            <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
-            <CardDescription>
-              Hours logged over the selected period.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            {lineChartData.some(d => d.hours > 0) ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={lineChartData}>
-                  <XAxis
-                    dataKey="name"
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}h`}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="hours"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "hsl(var(--primary))" }}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-80 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm">No activity in this period</p>
-                  <p className="text-xs mt-1">Log hours to see your activity here</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-4">
+          <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
+              <CardDescription>
+                Hours logged over the selected period.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+              {lineChartData.some(d => d.hours > 0) ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={lineChartData}>
+                    <XAxis
+                      dataKey="name"
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${value}h`}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="hours"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <AnimatedEmptyState
+                  title="No activity in this period"
+                  description="Log hours to see your activity here"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-3">
+          <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
+              <CardDescription>
+                Time spent across projects.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <PieChart>
+                    <Pie
+                      data={projectPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {projectPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => value.toFixed(2)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <AnimatedEmptyState
+                  title="No projects tracked"
+                  description="Create a project and log hours to get started"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      <motion.div variants={chartVariants} initial="hidden" animate="visible">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
-            <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
+            <CardTitle>Recent Entries ({rangeLabel})</CardTitle>
             <CardDescription>
-              Time spent across projects.
+              Logged sessions in this period.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {projectPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={projectPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {projectPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-80 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm">No projects tracked</p>
-                  <p className="text-xs mt-1">Create a project and log hours to get started</p>
-                </div>
-              </div>
-            )}
+            <motion.div className="space-y-3" variants={containerVariants} initial="hidden" animate="visible">
+              {filteredEntries.length > 0 ? (
+                filteredEntries.slice(0, 10).map((entry) => {
+                  const project = projects.find(p => p.id === entry.projectId);
+                  return (
+                    <AnimatedListItem key={entry.id} className="entry-row" data-testid={`entry-${entry.id}`}>
+                      <div className="entry-indicator" style={{ backgroundColor: project?.color || 'gray' }} />
+                      <div className="entry-details">
+                        <p className="entry-project-name">{project?.name || 'Unknown Project'}</p>
+                        <p className="entry-meta">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
+                      </div>
+                      <div className="entry-stats">
+                        <p className="entry-hours">{formatDuration(entry.minutes)}</p>
+                        <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
+                      </div>
+                    </AnimatedListItem>
+                  )
+                })
+              ) : (
+                <AnimatedEmptyState
+                  title="No time entries in this period"
+                  description="Start logging hours to track your productivity and earnings"
+                />
+              )}
+            </motion.div>
           </CardContent>
         </Card>
-      </div>
-
-      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle>Recent Entries ({rangeLabel})</CardTitle>
-          <CardDescription>
-            Logged sessions in this period.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {filteredEntries.length > 0 ? (
-              filteredEntries.slice(0, 10).map((entry) => {
-                const project = projects.find(p => p.id === entry.projectId);
-                return (
-                  <div key={entry.id} className="entry-row" data-testid={`entry-${entry.id}`}>
-                    <div className="entry-indicator" style={{ backgroundColor: project?.color || 'gray' }} />
-                    <div className="entry-details">
-                      <p className="entry-project-name">{project?.name || 'Unknown Project'}</p>
-                      <p className="entry-meta">{format(new Date(entry.date), "PPP")} • {entry.description || 'No description'}</p>
-                    </div>
-                    <div className="entry-stats">
-                      <p className="entry-hours">{formatDuration(entry.minutes)}</p>
-                      <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="entry-empty-state">
-                <p className="entry-empty-title">No time entries in this period</p>
-                <p className="entry-empty-subtitle">Start logging hours to track your productivity and earnings</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      </motion.div>
     </div>
   );
 }

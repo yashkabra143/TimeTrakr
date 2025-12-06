@@ -1,4 +1,5 @@
 import { useLocation, Link } from "wouter";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -28,6 +29,7 @@ import {
 import { EarningsCalculator } from "@/components/earnings-calculator";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import Galaxy from "@/components/galaxy";
+import { pageVariants } from "@/lib/animations";
 
 
 const NAV_ITEMS = [
@@ -215,9 +217,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 min-h-screen flex flex-col">
-        <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <motion.div
+          key={location}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full"
+        >
           {children}
-        </div>
+        </motion.div>
       </main>
     </div>
   );
