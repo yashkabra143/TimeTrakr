@@ -68,8 +68,9 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       } else {
         try {
           // Parse as H.MM format (matching UI help text)
-          const hoursValue = watchedHours ?? 0;
-          if (typeof hoursValue === "number" && !Number.isNaN(hoursValue) && hoursValue > 0) {
+          // Convert to number since form.watch may return a string from input fields
+          const hoursValue = Number(watchedHours) || 0;
+          if (!Number.isNaN(hoursValue) && hoursValue > 0) {
             const parsed = parseTimeInput(hoursValue, { format: "hm" });
             const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
             gross = hoursDecimal * project.rate;
