@@ -16,8 +16,12 @@ import { formatMinutesReadable, minutesToHoursDecimal, parseTimeInput } from "@s
 
 const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
-  hours: z.coerce.number().min(0, "Hours must be positive"),
-  amount: z.coerce.number().optional(),
+  hours: z.coerce.number()
+    .min(0, "Hours must be positive")
+    .max(24, "Cannot log more than 24 hours in one entry"),
+  amount: z.coerce.number()
+    .min(0.01, "Amount must be at least $0.01")
+    .optional(),
   date: z.date({
     required_error: "A date of entry is required.",
   }),
@@ -25,14 +29,16 @@ const formSchema = z.object({
 });
 
 export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, className?: string }) {
-  const { data: projects = [] } = useProjects();
-  const { data: deductions } = useDeductions();
-  const { data: currency } = useCurrencySettings();
+  const { data: projects = [], isLoading: projectsLoading } = useProjects();
+  const { data: deductions, isLoading: deductionsLoading } = useDeductions();
+  const { data: currency, isLoading: currencyLoading } = useCurrencySettings();
   const { data: entries = [] } = useTimeEntries();
   const createEntry = useCreateTimeEntry();
   const { toast } = useToast();
   const [calculated, setCalculated] = useState({ gross: 0, netUsd: 0, netInr: 0 });
   const [remainingBudget, setRemainingBudget] = useState(0);
+  
+  const isLoading = projectsLoading || deductionsLoading || currencyLoading;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,19 +72,11 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
         gross = watchedAmount || 0;
       } else {
-        try {
-          // Parse as H.MM format (matching UI help text)
-          // Convert to number since form.watch may return a string from input fields
-          const hoursValue = Number(watchedHours) || 0;
-          if (!Number.isNaN(hoursValue) && hoursValue > 0) {
-            const parsed = parseTimeInput(hoursValue, { format: "hm" });
-            const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
-            gross = hoursDecimal * project.rate;
-          } else {
-            gross = 0;
-          }
-        } catch (err) {
-          console.error("[ENTRY FORM] Failed to parse hours", err);
+        // Use decimal hours (standard time tracking format)
+        const hoursValue = Number(watchedHours) || 0;
+        if (!Number.isNaN(hoursValue) && hoursValue > 0) {
+          gross = hoursValue * project.rate;
+        } else {
           gross = 0;
         }
       }
@@ -93,7 +91,8 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       const tdsAmt = gross * (tdsPercent / 100);
       const gstAmt = serviceAmt * (gstPercent / 100);
 
-      const totalDeductions = serviceAmt + tdsAmt + gstAmt;
+      // Match server-side calculation (includes transfer fee)
+      const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferFee;
       const netUsd = Math.max(0, gross - totalDeductions);
       const netInr = netUsd * currency.usdToInr;
 
@@ -130,14 +129,14 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
       if (!isFixed) {
         try {
-          // Parse as H.MM format (matching UI help text)
-          const parsed = parseTimeInput(values.hours ?? 0, { format: "hm" });
+          // Use decimal hours (standard format: 1.5 = 1h 30m)
+          const parsed = parseTimeInput(values.hours ?? 0, { format: "fractional" });
           parsedMinutes = parsed.minutes;
-          parsedFormat = "hm";
+          parsedFormat = "fractional";
         } catch (err) {
           toast({
             title: "Invalid time",
-            description: "Please enter time as H.MM (e.g., 1.50 for 1h 50m).",
+            description: "Please enter time in decimal hours (e.g., 1.5 = 1h 30m).",
             variant: "destructive",
           });
           console.error("[ENTRY FORM] Parse error", err);
@@ -183,10 +182,21 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
   const selectedProject = projects.find(p => p.id === watchedProjectId);
   const isFixedProject = selectedProject?.type === "fixed";
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground">Loading form...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className={cn("space-y-4 md:space-y-6", className)}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="flex flex-col-reverse lg:grid lg:grid-cols-2 gap-4 md:gap-6">
           <div className="space-y-4">
             <FormField
               control={form.control}
@@ -269,10 +279,18 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                     <FormControl>
                       <div className="relative">
                         <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input data-testid="input-hours" type="number" step="0.01" placeholder="1.50" className="pl-9" {...field} />
+                        <Input 
+                          data-testid="input-hours" 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="1.50" 
+                          className="pl-9 text-base md:text-sm" 
+                          inputMode="decimal"
+                          {...field} 
+                        />
                       </div>
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Enter time as H.MM (minutes after the decimal). Example: 1.5 = 1h 50m, 2.25 = 2h 25m.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter time in decimal hours. Example: 1.5 = 1h 30m, 2.25 = 2h 15m, 0.5 = 30m.</p>
                     <FormMessage />
                   </FormItem>
                 )}
