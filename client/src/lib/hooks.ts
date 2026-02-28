@@ -2,6 +2,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
 import type { InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry, InsertWithdrawal } from "@shared/schema";
 
+// CSV Imports
+export function useImportTimeEntries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (csv: string) => api.importTimeEntriesCSV(csv),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["entries"] }),
+  });
+}
+
+export function useImportWithdrawals() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (csv: string) => api.importWithdrawalsCSV(csv),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["withdrawals"] }),
+  });
+}
+
 // Projects
 export function useProjects() {
   return useQuery({

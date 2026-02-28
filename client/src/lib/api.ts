@@ -127,3 +127,26 @@ export async function deleteWithdrawal(id: string): Promise<void> {
   });
   if (!response.ok) throw new Error("Failed to delete withdrawal");
 }
+
+// CSV Imports
+export type ImportResult = { imported: number; failed: { row: number; reason: string }[]; total: number };
+
+export async function importTimeEntriesCSV(csv: string): Promise<ImportResult> {
+  const response = await fetch(`${API_URL}/entries/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csv }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+export async function importWithdrawalsCSV(csv: string): Promise<ImportResult> {
+  const response = await fetch(`${API_URL}/withdrawals/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csv }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}

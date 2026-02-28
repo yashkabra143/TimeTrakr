@@ -508,6 +508,159 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
+  // ── CSV Import: Time Entries ─────────────────────────────────────────────
+  // Expected CSV columns: date, project, hours, description (description optional)
+  app.post("/api/entries/import", async (req, res) => {
+    try {
+      const { csv } = req.body as { csv: string };
+      if (!csv || typeof csv !== "string") {
+        return res.status(400).json({ message: "No CSV content provided" });
+      }
+
+      // Parse CSV
+      const lines = csv.trim().split(/\r?\n/);
+      if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
+
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
+      const requiredCols = ["date", "project", "hours"];
+      const missing = requiredCols.filter(c => !headers.includes(c));
+      if (missing.length) return res.status(400).json({ message: `Missing required columns: ${missing.join(", ")}` });
+
+      const [projects, deductions, currency] = await Promise.all([
+        storage.getProjects(),
+        storage.getDeductions(),
+        storage.getCurrencySettings(),
+      ]);
+
+      if (!deductions || !currency) return res.status(500).json({ message: "Settings not configured" });
+
+      const imported: number[] = [];
+      const failed: { row: number; reason: string }[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Handle quoted values with commas inside
+        const values = line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map(v => v.trim().replace(/^"|"$/g, "")) ?? line.split(",").map(v => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
+
+        // Validate date
+        const dateVal = new Date(row.date + "T00:00:00");
+        if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
+
+        // Validate hours
+        const hoursVal = parseFloat(row.hours);
+        if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row.hours}"` }); continue; }
+
+        // Match project (case-insensitive)
+        const project = projects.find(p => p.name.toLowerCase() === (row.project || "").toLowerCase());
+        if (!project) { failed.push({ row: i, reason: `Project not found: "${row.project}"` }); continue; }
+
+        // Calculate
+        const minutes = Math.round(hoursVal * 60);
+        const hoursDecimal = minutes / 60;
+        const rate = Number(project.rate);
+        const grossUsd = project.type === "fixed" ? rate : hoursDecimal * rate;
+        const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
+        const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
+        const gst = svc * ((Number(deductions.gst) || 0) / 100);
+        const total = svc + tds + gst;
+        const netUsd = Math.max(0, grossUsd - total);
+        const exchangeRate = Number(currency.usdToInr) || 0;
+
+        try {
+          const entry = await storage.createTimeEntry({
+            projectId: project.id,
+            minutes,
+            inputFormat: "fractional",
+            rawInput: String(hoursVal),
+            date: dateVal,
+            description: row.description || null,
+            grossUsd,
+            deductionService: svc,
+            deductionGst: gst,
+            deductionTds: tds,
+            deductionTransfer: 0,
+            deductionTotal: total,
+            netUsd,
+            netInr: netUsd * exchangeRate,
+            exchangeRate,
+          });
+          imported.push(entry.id as unknown as number);
+        } catch (err) {
+          failed.push({ row: i, reason: "Failed to save entry" });
+        }
+      }
+
+      res.json({ imported: imported.length, failed, total: lines.length - 1 });
+    } catch (error) {
+      console.error("[ENTRIES IMPORT] Error:", error);
+      res.status(500).json({ message: "Import failed" });
+    }
+  });
+
+  // ── CSV Import: Withdrawals ───────────────────────────────────────────────
+  // Expected CSV columns: date, amount, notes (optional), status (optional: pending/received)
+  app.post("/api/withdrawals/import", async (req, res) => {
+    try {
+      const { csv } = req.body as { csv: string };
+      if (!csv || typeof csv !== "string") {
+        return res.status(400).json({ message: "No CSV content provided" });
+      }
+
+      const lines = csv.trim().split(/\r?\n/);
+      if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header and at least one row" });
+
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
+      if (!headers.includes("date") || !headers.includes("amount")) {
+        return res.status(400).json({ message: "Missing required columns: date, amount" });
+      }
+
+      const imported: string[] = [];
+      const failed: { row: number; reason: string }[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map(v => v.trim().replace(/^"|"$/g, "")) ?? line.split(",").map(v => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
+
+        const dateVal = new Date(row.date + "T00:00:00");
+        if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
+
+        const amount = parseFloat(row.amount);
+        if (isNaN(amount) || amount <= 0) { failed.push({ row: i, reason: `Invalid amount: "${row.amount}"` }); continue; }
+
+        const transactionFee = 0.99;
+        const withdrawalAmount = Math.max(0, amount - transactionFee);
+        const status = ["pending", "received"].includes((row.status || "").toLowerCase()) ? (row.status || "pending").toLowerCase() : "pending";
+
+        try {
+          const w = await storage.createWithdrawal({
+            netEarnings: amount,
+            transactionFee,
+            withdrawalAmount,
+            withdrawalDate: dateVal,
+            paymentStatus: status,
+            notes: row.notes || null,
+          });
+          imported.push(w.id);
+        } catch (err) {
+          failed.push({ row: i, reason: "Failed to save withdrawal" });
+        }
+      }
+
+      res.json({ imported: imported.length, failed, total: lines.length - 1 });
+    } catch (error) {
+      console.error("[WITHDRAWALS IMPORT] Error:", error);
+      res.status(500).json({ message: "Import failed" });
+    }
+  });
+
   // Catch-all - MUST be last, after all other routes
   // In development, Vite handles non-API routes, so we only add catch-all in production/serverless
   if (process.env.NODE_ENV === 'production' || isServerless) {
