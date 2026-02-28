@@ -128,7 +128,7 @@ export function EarningsCalculator() {
                   className="text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Enter time as H.MM (minutes after decimal). Example: 8.20 = 8h 20m, 1.5 = 1h 50m
+                  Enter as H.MM where MM = minutes (00–59). Examples: 1.30 = 1h 30m · 8.20 = 8h 20m · 0.30 = 30 mins.
                 </p>
               </div>
 
