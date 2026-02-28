@@ -19,9 +19,7 @@ const formSchema = z.object({
   hours: z.coerce.number()
     .min(0.01, "Hours must be greater than 0")
     .max(24, "Cannot log more than 24 hours in one entry"),
-  amount: z.coerce.number()
-    .min(0.01, "Amount must be at least $0.01")
-    .optional(),
+  amount: z.coerce.number().min(0).optional(),
   date: z.date({
     required_error: "A date of entry is required.",
   }),
@@ -43,8 +41,8 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      hours: 0,
-      amount: 0,
+      hours: undefined,
+      amount: undefined,
       date: new Date(),
       description: "",
     },
@@ -82,14 +80,13 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       const serviceFeePercent = deductions.serviceFee || 0;
       const tdsPercent = deductions.tds || 0;
       const gstPercent = deductions.gst || 0;
-      const transferFee = deductions.transferFee || 0;
 
       const serviceAmt = gross * (serviceFeePercent / 100);
       const tdsAmt = gross * (tdsPercent / 100);
       const gstAmt = serviceAmt * (gstPercent / 100);
 
-      // Match server-side calculation (includes transfer fee)
-      const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferFee;
+      // No transfer/withdrawal fee here — applies only at withdrawal time
+      const totalDeductions = serviceAmt + tdsAmt + gstAmt;
       const netUsd = Math.max(0, gross - totalDeductions);
       const netInr = netUsd * currency.usdToInr;
 
@@ -158,8 +155,8 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
       form.reset({
         projectId: values.projectId,
-        hours: 0,
-        amount: 0,
+        hours: undefined,
+        amount: undefined,
         date: new Date(),
         description: "",
       });

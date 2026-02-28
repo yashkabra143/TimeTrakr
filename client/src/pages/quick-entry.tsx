@@ -1,13 +1,16 @@
 import { EntryForm } from "@/components/entry-form";
+import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function QuickEntry() {
   return (
     <div className="space-y-6 md:space-y-8 max-w-3xl mx-auto px-4 md:px-0">
-      <div className="flex flex-col gap-1 md:gap-2">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Quick Entry</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Log your hours quickly for any project.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Quick Entry</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Log your hours quickly for any project.</p>
+        </div>
+        <CsvImportDialog type="entries" />
       </div>
 
       <Card className="border-none shadow-lg">

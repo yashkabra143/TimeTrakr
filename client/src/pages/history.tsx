@@ -18,7 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp, Upload } from "lucide-react";
+import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -332,6 +333,16 @@ export default function History() {
                         </CardContent>
                     </Card>
 
+                    <div className="flex gap-2">
+                        <CsvImportDialog
+                          type="withdrawals"
+                          trigger={
+                            <Button variant="outline" size="lg" className="h-full">
+                              <Upload className="mr-2 h-4 w-4" /> Import CSV
+                            </Button>
+                          }
+                        />
+
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogTrigger asChild>
                             <Button size="lg" className="shadow-lg shadow-primary/20 h-full">
@@ -449,6 +460,7 @@ export default function History() {
                             </Form>
                         </DialogContent>
                     </Dialog>
+                    </div>
                 </div>
             </div>
 
