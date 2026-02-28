@@ -654,15 +654,19 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
 
         } else {
-          // ── Simple format: date, project, hours, description ───────────
+          // ── Simple / Upwork Hours format ───────────────────────────────
+          // Accepts: date, project, hours, description
+          //      OR: date, contract, hours          (Upwork hours report)
           const dateVal = parseDate(row["date"]);
           if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
           const hoursVal = parseFloat(row["hours"]);
           if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row["hours"]}"` }); continue; }
 
-          const project = projects.find(p => p.name.toLowerCase() === (row["project"] || "").toLowerCase());
-          if (!project) { failed.push({ row: i, reason: `Project not found: "${row["project"]}"` }); continue; }
+          // Accept "contract" (Upwork) or "project" (simple) as project name
+          const projectName = row["contract"] || row["project"] || "";
+          const project = projects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
+          if (!project) { failed.push({ row: i, reason: `Project not found: "${projectName}" — make sure it exists in Settings` }); continue; }
 
           const minutes = Math.round(hoursVal * 60);
           const rate = Number(project.rate);
