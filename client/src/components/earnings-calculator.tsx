@@ -20,7 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useProjects, useDeductions, useCurrencySettings } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
-import { parseTimeInput, minutesToHoursDecimal, formatMinutesReadable } from "@shared/time";
+import { formatMinutesReadable } from "@shared/time";
 
 export function EarningsCalculator() {
   const [open, setOpen] = useState(false);
@@ -36,16 +36,10 @@ export function EarningsCalculator() {
   const calculateEarnings = () => {
     if (!timeInput || !selectedProject || !deductions || !currency) return null;
 
-    // Parse time input as H.MM format (matching UI help text)
-    let parsedTime;
-    try {
-      parsedTime = parseTimeInput(timeInput, { format: "hm" });
-    } catch (err) {
-      return null;
-    }
+    // Direct decimal multiplication: 1.30 × rate = 9.10
+    const hoursDecimal = parseFloat(String(timeInput)) || 0;
+    if (hoursDecimal <= 0) return null;
 
-    const minutes = parsedTime.minutes;
-    const hoursDecimal = minutesToHoursDecimal(minutes);
     const rate = selectedProject.rate;
     const grossUsd = hoursDecimal * rate;
 
@@ -67,6 +61,8 @@ export function EarningsCalculator() {
     const exchangeRate = currency.usdToInr || 0;
     const grossInr = grossUsd * exchangeRate;
     const netInr = netUsd * exchangeRate;
+
+    const minutes = Math.round(hoursDecimal * 60);
 
     return {
       minutes,
@@ -128,7 +124,7 @@ export function EarningsCalculator() {
                   className="text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Enter as H.MM where MM = minutes (00–59). Examples: 1.30 = 1h 30m · 8.20 = 8h 20m · 0.30 = 30 mins.
+                  Enter hours as a number. Example: 1.30 = 1 hr 30 mins · 8.20 = 8 hr 20 mins · 0.30 = 30 mins.
                 </p>
               </div>
 
