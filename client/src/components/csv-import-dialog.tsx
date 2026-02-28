@@ -8,11 +8,13 @@ import { useImportTimeEntries, useImportWithdrawals } from "@/lib/hooks";
 import type { ImportResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+type ImportResultEx = ImportResult & { skipped?: number };
+
 // ── Template CSV strings ───────────────────────────────────────────────────
 const ENTRY_TEMPLATE = `date,project,hours,description
-2024-01-15,My Project,2.30,API integration work
-2024-01-16,My Project,1.45,Bug fixes and testing
-2024-02-01,My Project,3.00,Feature development`;
+1/15/2026,My Project,2.30,API integration work
+1/16/2026,My Project,1.45,Bug fixes and testing
+2/1/2026,My Project,3.00,Feature development`;
 
 const WITHDRAWAL_TEMPLATE = `date,amount,notes,status
 2024-01-31,250.50,January earnings,received
@@ -29,10 +31,10 @@ function downloadTemplate(content: string, filename: string) {
 }
 
 // ── Result Summary ─────────────────────────────────────────────────────────
-function ImportSummary({ result, onReset }: { result: ImportResult; onReset: () => void }) {
+function ImportSummary({ result, onReset }: { result: ImportResultEx; onReset: () => void }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3 text-center">
+      <div className={cn("grid gap-3 text-center", result.skipped ? "grid-cols-4" : "grid-cols-3")}>
         <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
           <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto mb-1" />
           <p className="text-2xl font-bold text-green-700 dark:text-green-400">{result.imported}</p>
@@ -43,12 +45,24 @@ function ImportSummary({ result, onReset }: { result: ImportResult; onReset: () 
           <p className="text-2xl font-bold text-red-600 dark:text-red-400">{result.failed.length}</p>
           <p className="text-xs text-red-500">Failed</p>
         </div>
+        {result.skipped ? (
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <AlertCircle className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{result.skipped}</p>
+            <p className="text-xs text-yellow-600">Skipped</p>
+          </div>
+        ) : null}
         <div className="p-3 bg-muted rounded-lg border border-border">
           <FileText className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
           <p className="text-2xl font-bold">{result.total}</p>
           <p className="text-xs text-muted-foreground">Total Rows</p>
         </div>
       </div>
+      {result.skipped ? (
+        <p className="text-xs text-muted-foreground text-center">
+          ℹ️ Skipped rows = service fees, withdrawals & non-earning transactions (expected for Upwork reports)
+        </p>
+      ) : null}
 
       {result.failed.length > 0 && (
         <div className="space-y-2">
@@ -128,7 +142,7 @@ interface CsvImportDialogProps {
 
 export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
   const [open, setOpen] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [result, setResult] = useState<ImportResultEx | null>(null);
   const [csvText, setCsvText] = useState<string | null>(null);
 
   const importEntries = useImportTimeEntries();
@@ -166,8 +180,8 @@ export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
           <DialogTitle>Import {isEntries ? "Time Entries" : "Withdrawals"} via CSV</DialogTitle>
           <DialogDescription>
             {isEntries
-              ? "Upload a CSV with columns: date, project, hours, description (optional)."
-              : "Upload a CSV with columns: date, amount, notes (optional), status (optional)."}
+              ? "Upload your Upwork transaction report CSV directly, or use the simple format: date, project, hours, description."
+              : "Upload a CSV with columns: date, amount, notes (optional), status (optional: pending/received)."}
           </DialogDescription>
         </DialogHeader>
 
@@ -191,10 +205,10 @@ export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
             </div>
 
             {/* Column format reference */}
-            <div className="rounded-lg bg-muted/30 border border-border p-3 text-xs font-mono text-muted-foreground overflow-x-auto">
+            <div className="rounded-lg bg-muted/30 border border-border p-3 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap">
               {isEntries
-                ? "date, project, hours, description\n2024-01-15, My Project, 2.30, Work done"
-                : "date, amount, notes, status\n2024-01-31, 250.50, January, received"}
+                ? "✅ Upwork report: upload as-is (auto-detected)\n\n✅ Simple format:\ndate, project, hours, description\n1/15/2026, My Project, 2.30, Work done"
+                : "date, amount, notes, status\n1/31/2026, 250.50, January, received"}
             </div>
 
             <DropZone onFile={handleFile} isLoading={mutation.isPending} />

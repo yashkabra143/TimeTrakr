@@ -509,92 +509,189 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── CSV Import: Time Entries ─────────────────────────────────────────────
-  // Expected CSV columns: date, project, hours, description (description optional)
+  // Supports two formats:
+  //   1. Simple:  date, project, hours, description
+  //   2. Upwork:  Date, Transaction ID, Transaction type, Transaction summary,
+  //               Transaction summary details, Description 1..3, Freelancer,
+  //               Client team, Account name, Amount $, ...
   app.post("/api/entries/import", async (req, res) => {
     try {
       const { csv } = req.body as { csv: string };
-      if (!csv || typeof csv !== "string") {
+      if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
+
+      // ── Parse CSV (handles quoted fields with commas) ──────────────────
+      function parseCSVLine(line: string): string[] {
+        const result: string[] = [];
+        let cur = "";
+        let inQuotes = false;
+        for (let ci = 0; ci < line.length; ci++) {
+          const ch = line[ci];
+          if (ch === '"') { inQuotes = !inQuotes; }
+          else if (ch === "," && !inQuotes) { result.push(cur.trim()); cur = ""; }
+          else { cur += ch; }
+        }
+        result.push(cur.trim());
+        return result;
       }
 
-      // Parse CSV
-      const lines = csv.trim().split(/\r?\n/);
-      if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
+      function parseDate(str: string): Date | null {
+        if (!str) return null;
+        // M/D/YYYY or MM/DD/YYYY
+        if (str.includes("/")) {
+          const d = new Date(str);
+          return isNaN(d.getTime()) ? null : d;
+        }
+        // YYYY-MM-DD
+        const d = new Date(str + "T00:00:00");
+        return isNaN(d.getTime()) ? null : d;
+      }
 
-      const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
-      const requiredCols = ["date", "project", "hours"];
-      const missing = requiredCols.filter(c => !headers.includes(c));
-      if (missing.length) return res.status(400).json({ message: `Missing required columns: ${missing.join(", ")}` });
+      const lines = csv.trim().split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2)
+        return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
+
+      const rawHeaders = parseCSVLine(lines[0]);
+      const headers = rawHeaders.map(h => h.toLowerCase().replace(/"/g, "").trim());
+
+      // ── Detect Upwork format ───────────────────────────────────────────
+      const isUpwork = headers.includes("transaction id") || headers.includes("transaction type") || headers.includes("amount $");
 
       const [projects, deductions, currency] = await Promise.all([
-        storage.getProjects(),
-        storage.getDeductions(),
-        storage.getCurrencySettings(),
+        storage.getProjects(), storage.getDeductions(), storage.getCurrencySettings(),
       ]);
+      if (!deductions || !currency)
+        return res.status(500).json({ message: "Deductions/currency settings not configured" });
 
-      if (!deductions || !currency) return res.status(500).json({ message: "Settings not configured" });
-
-      const imported: number[] = [];
+      const exchangeRate = Number(currency.usdToInr) || 0;
+      const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
+      // Track skipped rows (fees, withdrawals) — not failures
+      let skipped = 0;
+
+      // ── Upwork earnings transaction types to import ────────────────────
+      const EARNINGS_TYPES = [
+        "hourly", "fixed-price", "fixed price", "bonus", "manual time",
+        "client funded milestone", "milestone payment", "hourly payment",
+      ];
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Handle quoted values with commas inside
-        const values = line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map(v => v.trim().replace(/^"|"$/g, "")) ?? line.split(",").map(v => v.trim());
+        const values = parseCSVLine(line);
         const row: Record<string, string> = {};
-        headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
+        headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").replace(/^"|"$/g, "").trim(); });
 
-        // Validate date — supports YYYY-MM-DD and M/D/YYYY (e.g. 1/15/2026)
-        const dateVal = row.date.includes("/") ? new Date(row.date) : new Date(row.date + "T00:00:00");
-        if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
+        // ────────────────────────────────────────────────────────────────
+        if (isUpwork) {
+          // Skip non-earnings rows (service fees, withdrawals, refunds)
+          const txType = (row["transaction type"] || "").toLowerCase();
+          const amtRaw = row["amount $"] || row["amount"] || "";
+          const amtVal = parseFloat(amtRaw.replace(/[^0-9.\-]/g, ""));
 
-        // Validate hours
-        const hoursVal = parseFloat(row.hours);
-        if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row.hours}"` }); continue; }
+          if (isNaN(amtVal) || amtVal <= 0) { skipped++; continue; }
 
-        // Match project (case-insensitive)
-        const project = projects.find(p => p.name.toLowerCase() === (row.project || "").toLowerCase());
-        if (!project) { failed.push({ row: i, reason: `Project not found: "${row.project}"` }); continue; }
+          const isEarning = EARNINGS_TYPES.some(t => txType.includes(t)) || amtVal > 0;
+          if (!isEarning) { skipped++; continue; }
 
-        // Calculate
-        const minutes = Math.round(hoursVal * 60);
-        const hoursDecimal = minutes / 60;
-        const rate = Number(project.rate);
-        const grossUsd = project.type === "fixed" ? rate : hoursDecimal * rate;
-        const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
-        const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
-        const gst = svc * ((Number(deductions.gst) || 0) / 100);
-        const total = svc + tds + gst;
-        const netUsd = Math.max(0, grossUsd - total);
-        const exchangeRate = Number(currency.usdToInr) || 0;
+          // Date
+          const dateVal = parseDate(row["date"]);
+          if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
-        try {
-          const entry = await storage.createTimeEntry({
-            projectId: project.id,
-            minutes,
-            inputFormat: "fractional",
-            rawInput: String(hoursVal),
-            date: dateVal,
-            description: row.description || null,
-            grossUsd,
-            deductionService: svc,
-            deductionGst: gst,
-            deductionTds: tds,
-            deductionTransfer: 0,
-            deductionTotal: total,
-            netUsd,
-            netInr: netUsd * exchangeRate,
-            exchangeRate,
-          });
-          imported.push(entry.id as unknown as number);
-        } catch (err) {
-          failed.push({ row: i, reason: "Failed to save entry" });
+          // Build description from available fields
+          const descParts = [
+            row["transaction summary"],
+            row["transaction summary details"],
+            row["description 1"],
+            row["description 2"],
+            row["description 3"],
+          ].filter(Boolean);
+          const description = descParts.join(" · ").slice(0, 500) || null;
+
+          // Match project: try Transaction summary → Client team → Account name → first project
+          const tryNames = [
+            row["transaction summary"],
+            row["client team"],
+            row["account name"],
+            row["freelancer"],
+          ].filter(Boolean);
+
+          let project = tryNames.reduce<typeof projects[0] | undefined>((found, name) =>
+            found ?? projects.find(p => p.name.toLowerCase() === name.toLowerCase())
+          , undefined);
+
+          if (!project) project = projects[0]; // fallback to first project
+          if (!project) { failed.push({ row: i, reason: "No projects found in app — create one first" }); continue; }
+
+          // Use actual Upwork amount as gross (already reflects what Upwork paid out)
+          const grossUsd = amtVal;
+          const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
+          const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
+          const gst  = svc * ((Number(deductions.gst) || 0) / 100);
+          const total = svc + tds + gst;
+          const netUsd = Math.max(0, grossUsd - total);
+
+          try {
+            const entry = await storage.createTimeEntry({
+              projectId: project.id,
+              minutes: 0,
+              inputFormat: "fractional",
+              rawInput: String(amtVal),
+              date: dateVal,
+              description,
+              grossUsd,
+              deductionService: svc,
+              deductionGst: gst,
+              deductionTds: tds,
+              deductionTransfer: 0,
+              deductionTotal: total,
+              netUsd,
+              netInr: netUsd * exchangeRate,
+              exchangeRate,
+            });
+            imported.push(entry.id);
+          } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
+
+        } else {
+          // ── Simple / Upwork Hours format ───────────────────────────────
+          // Accepts: date, project, hours, description
+          //      OR: date, contract, hours          (Upwork hours report)
+          const dateVal = parseDate(row["date"]);
+          if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
+
+          const hoursVal = parseFloat(row["hours"]);
+          if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row["hours"]}"` }); continue; }
+
+          // Accept "contract" (Upwork) or "project" (simple) as project name
+          const projectName = row["contract"] || row["project"] || "";
+          const project = projects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
+          if (!project) { failed.push({ row: i, reason: `Project not found: "${projectName}" — make sure it exists in Settings` }); continue; }
+
+          const minutes = Math.round(hoursVal * 60);
+          const rate = Number(project.rate);
+          const grossUsd = hoursVal * rate;
+          const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
+          const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
+          const gst  = svc * ((Number(deductions.gst) || 0) / 100);
+          const total = svc + tds + gst;
+          const netUsd = Math.max(0, grossUsd - total);
+
+          try {
+            const entry = await storage.createTimeEntry({
+              projectId: project.id, minutes, inputFormat: "fractional",
+              rawInput: String(hoursVal), date: dateVal,
+              description: row["description"] || null,
+              grossUsd, deductionService: svc, deductionGst: gst, deductionTds: tds,
+              deductionTransfer: 0, deductionTotal: total,
+              netUsd, netInr: netUsd * exchangeRate, exchangeRate,
+            });
+            imported.push(entry.id);
+          } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
         }
       }
 
-      res.json({ imported: imported.length, failed, total: lines.length - 1 });
+      res.json({ imported: imported.length, failed, skipped, total: lines.length - 1 });
     } catch (error) {
       console.error("[ENTRIES IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
