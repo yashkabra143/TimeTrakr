@@ -394,18 +394,18 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       }
 
       // Deductions - stored as percentages (e.g., 10 means 10%)
+      // Transfer/withdrawal fee excluded — applies only at withdrawal time, not per entry
       const serviceFeePercent = Number(deductions.serviceFee) || 0;
       const tdsPercent = Number(deductions.tds) || 0;
       const gstPercent = Number(deductions.gst) || 0;
-      const transferFee = Number(deductions.transferFee) || 0;
 
       const deductionService = grossUsd * (serviceFeePercent / 100);
       const deductionTds = grossUsd * (tdsPercent / 100);
       const deductionGst = deductionService * (gstPercent / 100);
-      const deductionTransfer = transferFee;
-      const deductionTotal = deductionService + deductionTds + deductionGst + deductionTransfer;
+      const deductionTransfer = 0; // kept in schema for withdrawal history only
+      const deductionTotal = deductionService + deductionTds + deductionGst;
 
-      // Net calculations (includes transfer fee in deductions)
+      // Net calculations (transfer fee excluded from per-entry calculation)
       const netUsd = Math.max(0, grossUsd - deductionTotal);
 
       const exchangeRate = Number(currency.usdToInr) || 0;

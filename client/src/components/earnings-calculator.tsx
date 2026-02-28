@@ -43,19 +43,16 @@ export function EarningsCalculator() {
     const rate = selectedProject.rate;
     const grossUsd = hoursDecimal * rate;
 
-    // Calculate deductions
+    // Calculate deductions (transfer fee excluded — applies only at withdrawal)
     const serviceFeePercent = deductions.serviceFee || 0;
     const tdsPercent = deductions.tds || 0;
     const gstPercent = deductions.gst || 0;
-    const transferFee = deductions.transferFee || 0;
 
     const serviceAmt = grossUsd * (serviceFeePercent / 100);
     const tdsAmt = grossUsd * (tdsPercent / 100);
     const gstAmt = serviceAmt * (gstPercent / 100);
-    const transferAmt = transferFee;
 
-    // Include transfer fee in total deductions (matching server calculation)
-    const totalDeductions = serviceAmt + tdsAmt + gstAmt + transferAmt;
+    const totalDeductions = serviceAmt + tdsAmt + gstAmt;
     const netUsd = Math.max(0, grossUsd - totalDeductions);
 
     const exchangeRate = currency.usdToInr || 0;
@@ -77,7 +74,6 @@ export function EarningsCalculator() {
         serviceFee: serviceAmt,
         tds: tdsAmt,
         gst: gstAmt,
-        transfer: transferAmt,
         total: totalDeductions,
       },
       exchangeRate,
@@ -185,10 +181,6 @@ export function EarningsCalculator() {
                     <div className="flex justify-between items-center text-sm">
                       <span>GST ({deductions?.gst}%)</span>
                       <span className="font-medium">${result.deductions.gst.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Transfer Fee</span>
-                      <span className="font-medium">${result.deductions.transfer.toFixed(2)}</span>
                     </div>
                     <div className="border-t border-border pt-2 mt-2 flex justify-between items-center text-sm font-semibold">
                       <span>Total Deductions</span>
