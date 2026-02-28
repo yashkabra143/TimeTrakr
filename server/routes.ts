@@ -546,8 +546,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         const row: Record<string, string> = {};
         headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
 
-        // Validate date
-        const dateVal = new Date(row.date + "T00:00:00");
+        // Validate date — supports YYYY-MM-DD and M/D/YYYY (e.g. 1/15/2026)
+        const dateVal = row.date.includes("/") ? new Date(row.date) : new Date(row.date + "T00:00:00");
         if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
 
         // Validate hours
@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         const row: Record<string, string> = {};
         headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
 
-        const dateVal = new Date(row.date + "T00:00:00");
+        const dateVal = row.date.includes("/") ? new Date(row.date) : new Date(row.date + "T00:00:00");
         if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
 
         const amount = parseFloat(row.amount);
