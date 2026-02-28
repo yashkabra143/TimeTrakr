@@ -12,18 +12,13 @@ import { format } from "date-fns";
 
 import { useEffect, useState } from "react";
 import { useProjects, useDeductions, useCurrencySettings, useCreateTimeEntry, useTimeEntries } from "@/lib/hooks";
-import { formatMinutesReadable, minutesToHoursDecimal, parseTimeInput } from "@shared/time";
+import { formatMinutesReadable } from "@shared/time";
 
 const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
   hours: z.coerce.number()
-    .min(0, "Hours must be positive")
-    .max(23.59, "Cannot log more than 23h 59m in one entry")
-    .refine(val => {
-      // In H.MM format, the decimal part represents minutes (must be 00–59)
-      const minutePart = Math.round((val % 1) * 100);
-      return minutePart <= 59;
-    }, "Invalid minutes — must be 00 to 59. E.g. 1.30 = 1h 30m, not 1.60"),
+    .min(0.01, "Hours must be greater than 0")
+    .max(24, "Cannot log more than 24 hours in one entry"),
   amount: z.coerce.number()
     .min(0.01, "Amount must be at least $0.01")
     .optional(),
@@ -77,20 +72,10 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
         gross = watchedAmount || 0;
       } else {
-        try {
-          // Parse H.MM format: 1.30 = 1h 30m, 2.45 = 2h 45m
-          const hoursValue = Number(watchedHours) || 0;
-          if (!Number.isNaN(hoursValue) && hoursValue > 0) {
-            const parsed = parseTimeInput(hoursValue, { format: "hm" });
-            const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
-            gross = hoursDecimal * project.rate;
-          } else {
-            gross = 0;
-          }
-        } catch (err) {
-          console.error("[ENTRY FORM] Failed to parse hours", err);
-          gross = 0;
-        }
+        // Direct decimal multiplication: 1.30 × rate = gross
+        // e.g. 1.30 × 7 = 9.10, 2.45 × 7 = 17.15
+        const hoursValue = Number(watchedHours) || 0;
+        gross = hoursValue > 0 ? hoursValue * project.rate : 0;
       }
 
       // Calculate deductions
@@ -140,28 +125,18 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
       }
 
       if (!isFixed) {
-        try {
-          // Parse H.MM format: 1.30 = 1h 30m, 2.45 = 2h 45m
-          const parsed = parseTimeInput(values.hours ?? 0, { format: "hm" });
-          if (parsed.hadOverflow) {
-            toast({
-              title: "Invalid time",
-              description: "Minutes must be 00–59. For example: 1.30 = 1h 30m, not 1.60.",
-              variant: "destructive",
-            });
-            return;
-          }
-          parsedMinutes = parsed.minutes;
-          parsedFormat = "hm";
-        } catch (err) {
+        // Direct decimal: 1.30 hours = 1.30 × 60 = 78 minutes stored
+        const hoursVal = Number(values.hours ?? 0);
+        if (!hoursVal || hoursVal <= 0) {
           toast({
             title: "Invalid time",
-            description: "Enter time as H.MM — e.g. 1.30 = 1h 30m, 2.45 = 2h 45m.",
+            description: "Please enter hours worked. E.g. 1.30 for 1 hour 30 mins.",
             variant: "destructive",
           });
-          console.error("[ENTRY FORM] Parse error", err);
           return;
         }
+        parsedMinutes = Math.round(hoursVal * 60);
+        parsedFormat = "fractional";
       }
 
       await createEntry.mutateAsync({
@@ -310,7 +285,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                         />
                       </div>
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Enter as H.MM where MM = minutes (00–59). Examples: 1.30 = 1h 30m · 2.45 = 2h 45m · 0.30 = 30 mins.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter hours as a number. Example: 1.30 = 1 hr 30 mins · 2.45 = 2 hr 45 mins · 0.30 = 30 mins.</p>
                     <FormMessage />
                   </FormItem>
                 )}
