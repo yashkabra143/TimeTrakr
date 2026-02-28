@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Download, Upload, Trash2, Plus, RefreshCw, Clock, Briefcase } from "lucide-react";
+import { Save, Download, Upload, Trash2, Plus, RefreshCw, Clock, Briefcase, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -77,6 +77,7 @@ export default function Settings() {
   // State for dialogs
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<{ id: string; name: string; rate: number; color: string; type: "hourly" | "fixed" } | null>(null);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
 
   // Initialize user from localStorage
@@ -266,75 +267,41 @@ export default function Settings() {
               const globalIndex = projects.findIndex(p => p.id === field.id);
               return (
                 <div key={field.id} className="project-item">
-                  <div className="flex items-center gap-3">
-                    {/* Color Indicator */}
-                    <div className="w-5 h-5 rounded-full flex-shrink-0 border-2 border-white dark:border-gray-800 shadow-sm" style={{ backgroundColor: field.color }} />
-                    
-                    {/* Project Details */}
-                    <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      {/* Project Name */}
-                      <div className="md:col-span-6">
-                        <FormField
-                          control={projectForm.control}
-                          name={`projects.${globalIndex}.name`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs font-medium">Project Name</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  data-testid={`input-project-name-${globalIndex}`} 
-                                  className="project-name-input"
-                                  placeholder="Enter project name"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
+                  <div className="flex items-center gap-3 w-full">
+                    {/* Color dot */}
+                    <div className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm border border-white/20" style={{ backgroundColor: field.color }} />
 
-                      {/* Rate/Budget */}
-                      <div className="md:col-span-4">
-                        <FormField
-                          control={projectForm.control}
-                          name={`projects.${globalIndex}.rate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs font-medium">{rateLabel}</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
-                                  <Input 
-                                    type="number" 
-                                    step="0.01"
-                                    {...field} 
-                                    data-testid={`input-project-rate-${globalIndex}`} 
-                                    className="project-rate-input pl-7"
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
+                    {/* Project info (read-only) */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{field.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {type === "hourly" ? `$${field.rate}/hr` : `$${field.rate} fixed`}
+                      </p>
+                    </div>
 
-                      {/* Delete Button */}
-                      <div className="md:col-span-2 flex justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10 hover:bg-red-50 dark:hover:bg-red-950 hover:text-destructive"
-                          onClick={() => setDeleteProjectId(field.id)}
-                          data-testid={`button-delete-project-${globalIndex}`}
-                          title="Delete project"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                        title="Edit project"
+                        onClick={() => setEditingProject({ id: field.id, name: field.name, rate: field.rate, color: field.color, type: field.type as "hourly" | "fixed" })}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950 hover:text-destructive"
+                        onClick={() => setDeleteProjectId(field.id)}
+                        data-testid={`button-delete-project-${globalIndex}`}
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -680,6 +647,98 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={editingProject !== null} onOpenChange={(open) => !open && setEditingProject(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>Update the project name, rate, color, or type.</DialogDescription>
+          </DialogHeader>
+          {editingProject && (
+            <div className="space-y-4 py-2">
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Project Name</label>
+                <Input
+                  value={editingProject.name}
+                  onChange={e => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
+                  placeholder="Project name"
+                />
+              </div>
+
+              {/* Rate */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {editingProject.type === "hourly" ? "Hourly Rate ($)" : "Fixed Budget ($)"}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="pl-7"
+                    value={editingProject.rate}
+                    onChange={e => setEditingProject(p => p ? { ...p, rate: parseFloat(e.target.value) || 0 } : null)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Type */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Project Type</label>
+                <select
+                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  value={editingProject.type}
+                  onChange={e => setEditingProject(p => p ? { ...p, type: e.target.value as "hourly" | "fixed" } : null)}
+                >
+                  <option value="hourly">Hourly</option>
+                  <option value="fixed">Fixed Price</option>
+                </select>
+              </div>
+
+              {/* Color */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Color</label>
+                <div className="flex gap-2 flex-wrap">
+                  {PROJECT_COLORS.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditingProject(p => p ? { ...p, color: c } : null)}
+                      className="w-7 h-7 rounded-full border-2 transition-all"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: editingProject.color === c ? '#000' : 'transparent',
+                        transform: editingProject.color === c ? 'scale(1.2)' : 'scale(1)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!editingProject) return;
+                try {
+                  await updateProject.mutateAsync({ id: editingProject.id, data: { name: editingProject.name, rate: editingProject.rate, color: editingProject.color, type: editingProject.type } });
+                  toast({ title: "Project updated", description: `"${editingProject.name}" saved successfully.` });
+                  setEditingProject(null);
+                } catch {
+                  toast({ title: "Error", description: "Failed to update project.", variant: "destructive" });
+                }
+              }}
+              disabled={updateProject.isPending}
+            >
+              {updateProject.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Project Confirmation Dialog */}
       <AlertDialog open={deleteProjectId !== null} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
