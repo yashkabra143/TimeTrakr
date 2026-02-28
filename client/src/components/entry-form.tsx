@@ -18,7 +18,12 @@ const formSchema = z.object({
   projectId: z.string().min(1, "Please select a project"),
   hours: z.coerce.number()
     .min(0, "Hours must be positive")
-    .max(24, "Cannot log more than 24 hours in one entry"),
+    .max(23.59, "Cannot log more than 23h 59m in one entry")
+    .refine(val => {
+      // In H.MM format, the decimal part represents minutes (must be 00–59)
+      const minutePart = Math.round((val % 1) * 100);
+      return minutePart <= 59;
+    }, "Invalid minutes — must be 00 to 59. E.g. 1.30 = 1h 30m, not 1.60"),
   amount: z.coerce.number()
     .min(0.01, "Amount must be at least $0.01")
     .optional(),
@@ -72,11 +77,18 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
         gross = watchedAmount || 0;
       } else {
-        // Use decimal hours (standard time tracking format)
-        const hoursValue = Number(watchedHours) || 0;
-        if (!Number.isNaN(hoursValue) && hoursValue > 0) {
-          gross = hoursValue * project.rate;
-        } else {
+        try {
+          // Parse H.MM format: 1.30 = 1h 30m, 2.45 = 2h 45m
+          const hoursValue = Number(watchedHours) || 0;
+          if (!Number.isNaN(hoursValue) && hoursValue > 0) {
+            const parsed = parseTimeInput(hoursValue, { format: "hm" });
+            const hoursDecimal = minutesToHoursDecimal(parsed.minutes);
+            gross = hoursDecimal * project.rate;
+          } else {
+            gross = 0;
+          }
+        } catch (err) {
+          console.error("[ENTRY FORM] Failed to parse hours", err);
           gross = 0;
         }
       }
@@ -129,14 +141,22 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
 
       if (!isFixed) {
         try {
-          // Use decimal hours (standard format: 1.5 = 1h 30m)
-          const parsed = parseTimeInput(values.hours ?? 0, { format: "fractional" });
+          // Parse H.MM format: 1.30 = 1h 30m, 2.45 = 2h 45m
+          const parsed = parseTimeInput(values.hours ?? 0, { format: "hm" });
+          if (parsed.hadOverflow) {
+            toast({
+              title: "Invalid time",
+              description: "Minutes must be 00–59. For example: 1.30 = 1h 30m, not 1.60.",
+              variant: "destructive",
+            });
+            return;
+          }
           parsedMinutes = parsed.minutes;
-          parsedFormat = "fractional";
+          parsedFormat = "hm";
         } catch (err) {
           toast({
             title: "Invalid time",
-            description: "Please enter time in decimal hours (e.g., 1.5 = 1h 30m).",
+            description: "Enter time as H.MM — e.g. 1.30 = 1h 30m, 2.45 = 2h 45m.",
             variant: "destructive",
           });
           console.error("[ENTRY FORM] Parse error", err);
@@ -290,7 +310,7 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                         />
                       </div>
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">Enter time in decimal hours. Example: 1.5 = 1h 30m, 2.25 = 2h 15m, 0.5 = 30m.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter as H.MM where MM = minutes (00–59). Examples: 1.30 = 1h 30m · 2.45 = 2h 45m · 0.30 = 30 mins.</p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -304,15 +324,16 @@ export function EntryForm({ onSuccess, className }: { onSuccess?: () => void, cl
                 <FormItem>
                   <FormLabel>{isFixedProject ? "Submission Date" : "Date"}</FormLabel>
                   <FormControl>
-                    <div className="relative cursor-pointer">
-                      <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <div className="relative">
+                      <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
                       <Input
                         type="date"
-                        className="pl-9 [&::-webkit-calendar-picker-indicator]:opacity-0 cursor-pointer"
+                        className="pl-9 cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
                         data-testid="input-date"
                         value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                        max={format(new Date(), "yyyy-MM-dd")}
                         onChange={(e) => {
-                          const date = e.target.value ? new Date(e.target.value) : undefined;
+                          const date = e.target.value ? new Date(e.target.value + "T00:00:00") : undefined;
                           field.onChange(date);
                         }}
                       />
