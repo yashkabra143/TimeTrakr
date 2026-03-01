@@ -50,7 +50,7 @@ export function EarningsCalculator() {
 
     const serviceAmt = grossUsd * (serviceFeePercent / 100);
     const tdsAmt = grossUsd * (tdsPercent / 100);
-    const gstAmt = serviceAmt * (gstPercent / 100);
+    const gstAmt = serviceAmt * (gstPercent / 100); // GST on service fee
 
     const totalDeductions = serviceAmt + tdsAmt + gstAmt;
     const netUsd = Math.max(0, grossUsd - totalDeductions);
@@ -59,12 +59,16 @@ export function EarningsCalculator() {
     const grossInr = grossUsd * exchangeRate;
     const netInr = netUsd * exchangeRate;
 
-    const minutes = Math.round(hoursDecimal * 60);
+    // Time display: parse H.MM (1.30 → 1h 30m), separate from billing math
+    const [hPart, mPart = "0"] = String(timeInput).split(".");
+    const hInt = parseInt(hPart) || 0;
+    const mInt = parseInt(mPart.padEnd(2, "0").slice(0, 2)) || 0;
+    const displayMinutes = hInt * 60 + Math.min(mInt, 59);
 
     return {
-      minutes,
+      displayMinutes,
       hoursDecimal,
-      timeDisplay: formatMinutesReadable(minutes),
+      timeDisplay: formatMinutesReadable(displayMinutes),
       rate,
       grossUsd,
       grossInr,
@@ -108,19 +112,20 @@ export function EarningsCalculator() {
             {/* Input Section */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="time-input">Time (H.MM format)</Label>
+                <Label htmlFor="time-input">Hours Worked</Label>
                 <Input
                   id="time-input"
                   type="number"
-                  placeholder="8.20"
+                  placeholder="1.30"
                   value={timeInput}
                   onChange={(e) => setTimeInput(e.target.value)}
                   min="0"
                   step="0.01"
+                  inputMode="decimal"
                   className="text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Enter hours as a number. Example: 1.30 = 1 hr 30 mins · 8.20 = 8 hr 20 mins · 0.30 = 30 mins.
+                  Enter as H.MM — 1.30 = 1 hr 30 mins · 2.45 = 2 hr 45 mins · 0.30 = 30 mins
                 </p>
               </div>
 
@@ -146,8 +151,11 @@ export function EarningsCalculator() {
               <div className="space-y-4 pt-6 border-t border-border">
                 {/* Time Display */}
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Time Entered</p>
+                  <p className="text-xs text-muted-foreground mb-1">Time · Billing</p>
                   <p className="text-lg font-semibold">{result.timeDisplay}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {result.hoursDecimal} hrs × ${result.rate}/hr = ${result.grossUsd.toFixed(2)} gross
+                  </p>
                 </div>
 
                 {/* Gross Earnings */}
@@ -179,7 +187,7 @@ export function EarningsCalculator() {
                       <span className="font-medium">${result.deductions.tds.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span>GST ({deductions?.gst}%)</span>
+                      <span>GST ({deductions?.gst}% on service fee)</span>
                       <span className="font-medium">${result.deductions.gst.toFixed(2)}</span>
                     </div>
                     <div className="border-t border-border pt-2 mt-2 flex justify-between items-center text-sm font-semibold">
