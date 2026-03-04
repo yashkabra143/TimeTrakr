@@ -8,3 +8,5 @@ vite.config.ts.*
 # Local Netlify folder
 .netlify
 .vercel
+
+.builder/config/data.json

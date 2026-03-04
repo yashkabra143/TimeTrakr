@@ -14,6 +14,8 @@ import {
   DollarSign,
   Wallet,
   PieChart as PieChartIcon,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import {
   LineChart,
@@ -25,7 +27,8 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  CartesianGrid
 } from "recharts";
 import { format, startOfWeek, endOfWeek, startOfMonth, isWithinInterval, parseISO, subDays, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -43,6 +46,8 @@ export default function Dashboard() {
   const { data: projects = [] } = useProjects();
   const { data: currency } = useCurrencySettings();
   const [dateRange, setDateRange] = React.useState("week");
+  const [editingEntryId, setEditingEntryId] = React.useState<string | null>(null);
+  const [deletingEntryId, setDeletingEntryId] = React.useState<string | null>(null);
 
   // Helper to filter entries
   const getEntriesInDateRange = (startDate: Date, endDate: Date) => {
@@ -125,6 +130,16 @@ export default function Dashboard() {
       return { name: dateStr, hours, minutes };
     });
   }, [filteredEntries, currentInterval]);
+
+  // Calculate chart statistics
+  const chartStats = React.useMemo(() => {
+    if (lineChartData.length === 0) return { min: 0, max: 0, avg: 0 };
+    const hours = lineChartData.map(d => d.hours);
+    const min = Math.min(...hours);
+    const max = Math.max(...hours);
+    const avg = (hours.reduce((a, b) => a + b, 0) / hours.length).toFixed(1);
+    return { min: min.toFixed(1), max: max.toFixed(1), avg };
+  }, [lineChartData]);
 
   // Project Distribution
   const projectPieData = React.useMemo(() => {
@@ -222,39 +237,77 @@ export default function Dashboard() {
         <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-4">
           <Card className="col-span-4 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader>
-              <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
-              <CardDescription>
-                Hours logged over the selected period.
-              </CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle>Activity Trend ({rangeLabel})</CardTitle>
+                  <CardDescription>
+                    Hours logged over the selected period.
+                  </CardDescription>
+                </div>
+                {lineChartData.some(d => d.hours > 0) && (
+                  <div className="text-xs text-muted-foreground grid grid-cols-3 gap-3">
+                    <div className="text-center">
+                      <p className="font-semibold text-foreground">{chartStats.min}h</p>
+                      <p>Min</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-foreground">{chartStats.avg}h</p>
+                      <p>Avg</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-foreground">{chartStats.max}h</p>
+                      <p>Max</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="pl-2">
               {lineChartData.some(d => d.hours > 0) ? (
                 <ResponsiveContainer width="100%" height={350}>
                   <LineChart data={lineChartData}>
+                    <defs>
+                      <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground)/20)" />
                     <XAxis
                       dataKey="name"
-                      stroke="#888888"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      stroke="#888888"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(value) => `${value}h`}
                     />
                     <Tooltip
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: 'none',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        backgroundColor: 'hsl(var(--background))',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: number) => [`${value.toFixed(1)} hours`, 'Hours']}
+                      labelFormatter={(label) => `${label}`}
                     />
                     <Line
                       type="monotone"
                       dataKey="hours"
                       stroke="hsl(var(--primary))"
                       strokeWidth={3}
-                      dot={{ r: 4, fill: "hsl(var(--primary))" }}
-                      activeDot={{ r: 8 }}
+                      dot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                      activeDot={{ r: 7, strokeWidth: 2 }}
+                      fill="url(#colorGradient)"
+                      isAnimationActive={true}
+                      animationDuration={800}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -271,10 +324,19 @@ export default function Dashboard() {
         <motion.div variants={chartVariants} initial="hidden" animate="visible" className="col-span-3">
           <Card className="col-span-3 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader>
-              <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
-              <CardDescription>
-                Time spent across projects.
-              </CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle>Project Distribution ({rangeLabel})</CardTitle>
+                  <CardDescription>
+                    Time spent across projects.
+                  </CardDescription>
+                </div>
+                {projectPieData.length > 0 && (
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Total: {projectPieData.reduce((sum, p) => sum + p.value, 0).toFixed(1)}h
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {projectPieData.length > 0 ? (
@@ -285,16 +347,36 @@ export default function Dashboard() {
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
-                      outerRadius={80}
+                      outerRadius={90}
                       paddingAngle={5}
                       dataKey="value"
+                      animationBegin={0}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     >
                       {projectPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          stroke="hsl(var(--background))"
+                          strokeWidth={2}
+                        />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => value.toFixed(2)} />
-                    <Legend />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: 'none',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        backgroundColor: 'hsl(var(--background))',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: number) => [`${value.toFixed(2)} hours`, 'Time']}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -331,6 +413,24 @@ export default function Dashboard() {
                       <div className="entry-stats">
                         <p className="entry-hours">{formatDuration(entry.minutes)}</p>
                         <p className="entry-earnings">${(entry.grossUsd || 0).toFixed(2)} / ₹{(entry.netInr || 0).toFixed(0)}</p>
+                      </div>
+                      <div className="entry-actions">
+                        <button
+                          onClick={() => setEditingEntryId(entry.id)}
+                          className="entry-action-btn entry-edit-btn"
+                          title="Edit entry"
+                          aria-label="Edit entry"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingEntryId(entry.id)}
+                          className="entry-action-btn entry-delete-btn"
+                          title="Delete entry"
+                          aria-label="Delete entry"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </AnimatedListItem>
                   )

@@ -327,6 +327,22 @@
     @apply text-sm text-muted-foreground;
   }
 
+  .entry-actions {
+    @apply flex gap-2 flex-shrink-0;
+  }
+
+  .entry-action-btn {
+    @apply p-2 rounded-md transition-all duration-150 hover:scale-110 active:scale-95;
+  }
+
+  .entry-edit-btn {
+    @apply text-blue-500 hover:bg-blue-500/10 dark:text-blue-400;
+  }
+
+  .entry-delete-btn {
+    @apply text-destructive hover:bg-destructive/10 dark:text-destructive;
+  }
+
   .entry-empty-state {
     @apply text-center py-12 text-muted-foreground space-y-2;
   }
@@ -378,6 +394,22 @@
 
   /* Mobile Responsive Adjustments */
   @media (max-width: 768px) {
+    .entry-row {
+      @apply flex-wrap gap-2 p-3;
+    }
+
+    .entry-stats {
+      @apply w-full text-left;
+    }
+
+    .entry-actions {
+      @apply w-full justify-start;
+    }
+
+    .entry-action-btn {
+      @apply p-1.5;
+    }
+
     .withdrawal-row {
       @apply gap-2 p-3;
     }

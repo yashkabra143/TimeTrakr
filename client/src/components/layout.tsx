@@ -102,9 +102,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-bold text-primary">{(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}</span>
-                    </div>
+                    {user?.profilePicture ? (
+                      <img
+                        src={user.profilePicture}
+                        alt={user.fullName || user.username}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-primary">{(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}</span>
+                      </div>
+                    )}
                     <span className="hidden md:inline text-sm font-medium capitalize">{user?.fullName || user?.username}</span>
                     <ChevronDown className="w-4 h-4 opacity-50" />
                   </Button>
@@ -186,9 +194,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
                   <div className="p-4 border-t border-border space-y-3">
                     <div className="bg-muted rounded-lg p-3 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-primary">{(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}</span>
-                      </div>
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture}
+                          alt={user.fullName || user.username}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-bold text-primary">{(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground mb-0.5 truncate">Upwork Freelancer</p>
                         <p className="text-sm font-semibold truncate capitalize">{user?.fullName || user?.username}</p>
