@@ -11,6 +11,7 @@ import History from "@/pages/history";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import Register from "@/pages/register";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEffect } from "react";
 
@@ -54,9 +55,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Switch>
-        {/* Login route - redirect to dashboard if already authenticated */}
+        {/* Auth routes - redirect to dashboard if already authenticated */}
         <Route path="/login">
           {isAuthenticated ? <Redirect to="/" /> : <Login />}
+        </Route>
+        <Route path="/register">
+          {isAuthenticated ? <Redirect to="/" /> : <Register />}
         </Route>
 
         {/* Protected routes */}

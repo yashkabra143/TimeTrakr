@@ -1,53 +1,39 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Download, Upload, Trash2, Plus, RefreshCw, Clock, Briefcase, Pencil } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject } from "@/lib/hooks";
-import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// Predefined color palette for projects
 const PROJECT_COLORS = [
-  "#3b82f6", // blue
-  "#8b5cf6", // purple
-  "#ec4899", // pink
-  "#f59e0b", // amber
-  "#10b981", // emerald
-  "#06b6d4", // cyan
-  "#f97316", // orange
-  "#14b8a6", // teal
-  "#6366f1", // indigo
-  "#a855f7", // violet
+  "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
+  "#06b6d4", "#f97316", "#14b8a6", "#6366f1", "#a855f7",
 ];
-
-
-
-const projectSchema = z.object({
-  projects: z.array(z.object({
-    id: z.string(),
-    name: z.string().min(1, "Name is required"),
-    rate: z.coerce.number().min(0, "Rate must be positive"),
-    color: z.string(),
-    type: z.enum(["hourly", "fixed"]).default("hourly"),
-    createdAt: z.any().optional(),
-  })),
-});
 
 const newProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   rate: z.coerce.number().min(0, "Rate must be 0 or greater"),
   color: z.string(),
   type: z.enum(["hourly", "fixed"]).default("hourly"),
+});
+
+const projectSchema = z.object({
+  projects: z.array(z.object({
+    id: z.string(),
+    name: z.string().min(1, "Name is required"),
+    rate: z.coerce.number().min(0),
+    color: z.string(),
+    type: z.enum(["hourly", "fixed"]).default("hourly"),
+    createdAt: z.any().optional(),
+  })),
 });
 
 const deductionSchema = z.object({
@@ -60,6 +46,33 @@ const deductionSchema = z.object({
 const currencySchema = z.object({
   usdToInr: z.coerce.number().min(1),
 });
+
+type SectionTab = "general" | "financials" | "data";
+
+const TABS: { value: SectionTab; label: string }[] = [
+  { value: "general",    label: "Projects" },
+  { value: "financials", label: "Financials" },
+  { value: "data",       label: "Data" },
+];
+
+const fade = (i = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } },
+});
+
+function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+      <div className="px-6 pt-5 pb-4 border-b border-border/40">
+        <h3 className="text-sm font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>{title}</h3>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "'Manrope', sans-serif" }}>{description}</p>
+        )}
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const { data: projects = [] } = useProjects();
@@ -74,75 +87,20 @@ export default function Settings() {
   const updateCurrency = useUpdateCurrencySettings();
   const { toast } = useToast();
 
-  // State for dialogs
+  const [tab, setTab] = useState<SectionTab>("general");
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; rate: number; color: string; type: "hourly" | "fixed" } | null>(null);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
 
-  // Initialize user from localStorage
-  const [user, setUser] = useState<any>(() => {
-    const userStr = localStorage.getItem("user");
-    return userStr ? JSON.parse(userStr) : null;
-  });
+  const newProjectForm = useForm({ resolver: zodResolver(newProjectSchema), defaultValues: { name: "", rate: 0, color: PROJECT_COLORS[0], type: "hourly" as "hourly" | "fixed" } });
+  const projectForm = useForm({ resolver: zodResolver(projectSchema), defaultValues: { projects } });
+  const deductionForm = useForm({ resolver: zodResolver(deductionSchema), defaultValues: deductions });
+  const currencyForm = useForm({ resolver: zodResolver(currencySchema), defaultValues: { usdToInr: currency?.usdToInr || 84 } });
 
-  // Separate projects by type
-  const hourlyProjects = projects.filter(p => p.type === "hourly" || !p.type);
-  const fixedProjects = projects.filter(p => p.type === "fixed");
-
-  // New Project Form
-  const newProjectForm = useForm({
-    resolver: zodResolver(newProjectSchema),
-    defaultValues: {
-      name: "",
-      rate: 0,
-      color: PROJECT_COLORS[0],
-      type: "hourly" as "hourly" | "fixed",
-    },
-  });
-
-  // Project Form
-  const projectForm = useForm({
-    resolver: zodResolver(projectSchema),
-    defaultValues: { projects },
-  });
-
-  useEffect(() => {
-    if (projects.length > 0) {
-      projectForm.reset({ projects });
-    }
-  }, [projects]);
-
-  // Deduction Form
-  const deductionForm = useForm({
-    resolver: zodResolver(deductionSchema),
-    defaultValues: deductions,
-  });
-
-  useEffect(() => {
-    if (deductions) {
-      deductionForm.reset({
-        serviceFee: deductions.serviceFee,
-        tds: deductions.tds,
-        gst: deductions.gst,
-        transferFee: deductions.transferFee,
-      });
-    }
-  }, [deductions]);
-
-  // Currency Form
-  const currencyForm = useForm({
-    resolver: zodResolver(currencySchema),
-    defaultValues: { usdToInr: currency?.usdToInr || 84 },
-  });
-
-  useEffect(() => {
-    if (currency) {
-      currencyForm.reset({ usdToInr: currency.usdToInr });
-    }
-  }, [currency]);
-
-
+  useEffect(() => { if (projects.length > 0) projectForm.reset({ projects }); }, [projects]);
+  useEffect(() => { if (deductions) deductionForm.reset(deductions); }, [deductions]);
+  useEffect(() => { if (currency) currencyForm.reset({ usdToInr: currency.usdToInr }); }, [currency]);
 
   async function onProjectSubmit(data: any) {
     for (const p of data.projects) {
@@ -154,28 +112,22 @@ export default function Settings() {
   async function onNewProjectSubmit(data: z.infer<typeof newProjectSchema>) {
     try {
       await createProject.mutateAsync(data);
-      newProjectForm.reset({
-        name: "",
-        rate: 0,
-        color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)],
-        type: "hourly" as "hourly" | "fixed",
-      });
+      newProjectForm.reset({ name: "", rate: 0, color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)], type: "hourly" as "hourly" | "fixed" });
       setIsAddProjectOpen(false);
-      toast({ title: "Project Created", description: `${data.name} has been added successfully.` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to create project. Please try again.", variant: "destructive" });
+      toast({ title: "Project Created", description: `${data.name} has been added.` });
+    } catch {
+      toast({ title: "Error", description: "Failed to create project.", variant: "destructive" });
     }
   }
 
   async function handleDeleteProject() {
     if (!deleteProjectId) return;
-
     try {
       await deleteProject.mutateAsync(deleteProjectId);
       setDeleteProjectId(null);
-      toast({ title: "Project Deleted", description: "Project and associated entries have been removed." });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to delete project. Please try again.", variant: "destructive" });
+      toast({ title: "Project Deleted", description: "Project and entries removed." });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete project.", variant: "destructive" });
     }
   }
 
@@ -186,32 +138,20 @@ export default function Settings() {
 
   async function onCurrencySubmit(data: z.infer<typeof currencySchema>) {
     await updateCurrency.mutateAsync({ usdToInr: data.usdToInr });
-    toast({ title: "Currency Updated", description: `Exchange rate set to ₹${data.usdToInr}` });
+    toast({ title: "Currency Updated", description: `Rate set to ₹${data.usdToInr}` });
   }
 
   async function fetchLiveExchangeRate() {
     setIsFetchingRate(true);
     try {
-      const response = await fetch('https://api.frankfurter.dev/latest?from=USD&to=INR');
-      if (!response.ok) throw new Error('Failed to fetch exchange rate');
-
-      const data = await response.json();
-      const rate = data.rates.INR;
-
-      // Update form and save to database
-      await updateCurrency.mutateAsync({ usdToInr: rate });
-      currencyForm.setValue('usdToInr', rate);
-
-      toast({
-        title: "Exchange Rate Updated",
-        description: `Live rate fetched: ₹${rate.toFixed(2)} per USD`
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch live rate. Please enter manually.",
-        variant: "destructive"
-      });
+      const res = await fetch("https://api.frankfurter.dev/latest?from=USD&to=INR");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      await updateCurrency.mutateAsync({ usdToInr: data.rates.INR });
+      currencyForm.setValue("usdToInr", data.rates.INR);
+      toast({ title: "Rate Updated", description: `Live rate: ₹${data.rates.INR.toFixed(2)}` });
+    } catch {
+      toast({ title: "Error", description: "Failed to fetch live rate.", variant: "destructive" });
     } finally {
       setIsFetchingRate(false);
     }
@@ -219,437 +159,332 @@ export default function Settings() {
 
   const handleExport = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ projects, deductions, currency, entries }));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "timeflow_backup.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+    const a = document.createElement("a");
+    a.href = dataStr;
+    a.download = "timeflow_backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
-  const ProjectSection = ({ type, projects: sectionProjects, icon: Icon }: { type: "hourly" | "fixed", projects: any[], icon: React.ReactNode }) => {
-    const typeLabel = type === "hourly" ? "Hourly Projects" : "Fixed Price Projects";
-    const typeDescription = type === "hourly" 
-      ? "Projects billed by the hour" 
-      : "Projects with a fixed budget or total contract value";
-    const sectionColor = type === "hourly" ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900" : "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900";
-    const badgeColor = type === "hourly" ? "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100" : "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100";
-    const rateLabel = type === "hourly" ? "Hourly Rate ($)" : "Contract Budget ($)";
-
-    return (
-      <div className={`project-section rounded-xl border ${sectionColor} p-6 space-y-4`}>
-        {/* Section Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={type === "hourly" ? "text-blue-600 dark:text-blue-400" : "text-purple-600 dark:text-purple-400"}>
-              {Icon}
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                {typeLabel}
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${badgeColor}`}>
-                  {sectionProjects.length}
-                </span>
-              </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">{typeDescription}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Projects List */}
-        {sectionProjects.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No {type} projects yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-3 mt-6">
-            {sectionProjects.map((field, index) => {
-              const globalIndex = projects.findIndex(p => p.id === field.id);
-              return (
-                <div key={field.id} className="project-item">
-                  <div className="flex items-center gap-3 w-full">
-                    {/* Color dot */}
-                    <div className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm border border-white/20" style={{ backgroundColor: field.color }} />
-
-                    {/* Project info (read-only) */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{field.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {type === "hourly" ? `$${field.rate}/hr` : `$${field.rate} fixed`}
-                      </p>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                        title="Edit project"
-                        onClick={() => setEditingProject({ id: field.id, name: field.name, rate: field.rate, color: field.color, type: field.type as "hourly" | "fixed" })}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950 hover:text-destructive"
-                        onClick={() => setDeleteProjectId(field.id)}
-                        data-testid={`button-delete-project-${globalIndex}`}
-                        title="Delete project"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const hourlyProjects = projectForm.watch("projects").filter(p => p.type === "hourly" || !p.type);
+  const fixedProjects = projectForm.watch("projects").filter(p => p.type === "fixed");
 
   return (
-    <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto pb-12 px-4 md:px-0">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading">Settings</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Manage your preferences, rates, and data.</p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-7 pb-12">
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+      {/* Header */}
+      <motion.div {...fade(0)} className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "hsl(38,92%,50%)" }}>
+          <SettingsIcon className="w-4 h-4" style={{ color: "hsl(228,25%,9%)" }} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>Configuration</p>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Settings</h1>
+        </div>
+      </motion.div>
 
-          <TabsTrigger value="general" className="text-xs md:text-sm">General & Projects</TabsTrigger>
-          <TabsTrigger value="financials" className="text-xs md:text-sm">Financials</TabsTrigger>
-          <TabsTrigger value="data" className="text-xs md:text-sm">Data</TabsTrigger>
-        </TabsList>
+      {/* Tabs */}
+      <motion.div {...fade(1)}>
+        <div className="inline-flex gap-1 p-1 rounded-xl border border-border/60" style={{ background: "hsl(220,15%,95%)" }}>
+          {TABS.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className="px-5 h-8 rounded-lg text-xs font-semibold transition-all duration-200"
+              style={{
+                fontFamily: "'Manrope', sans-serif",
+                background: tab === t.value ? "white" : "transparent",
+                color: tab === t.value ? "hsl(228,25%,12%)" : "hsl(220,10%,48%)",
+                boxShadow: tab === t.value ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </motion.div>
 
+      {/* ── Projects tab ── */}
+      {tab === "general" && (
+        <motion.div {...fade(2)} className="space-y-4">
+          <SectionCard
+            title="Project Configuration"
+            description="Manage your freelance projects, rates, and contract types."
+          >
+            <Form {...projectForm}>
+              <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-6">
+                {projects.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <p className="text-sm font-medium">No projects yet</p>
+                    <p className="text-xs mt-1">Click "Add Project" to create your first project.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {[
+                      { type: "hourly" as const, list: hourlyProjects, icon: Clock, label: "Hourly Projects", desc: "Billed by the hour" },
+                      { type: "fixed" as const,  list: fixedProjects,  icon: Briefcase, label: "Fixed Price", desc: "Fixed budget contracts" },
+                    ].map(section => (
+                      <div key={section.type} className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <section.icon className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>
+                            {section.label}
+                          </span>
+                          <span className="ml-1 px-2 py-0.5 text-[10px] font-bold rounded-full"
+                            style={{ background: "hsl(220,15%,92%)", color: "hsl(220,10%,45%)", fontFamily: "'DM Mono', monospace" }}>
+                            {section.list.length}
+                          </span>
+                        </div>
 
+                        {section.list.length === 0 ? (
+                          <p className="text-xs text-muted-foreground pl-6" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                            No {section.type} projects.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {section.list.map((p) => {
+                              const globalIndex = projects.findIndex(x => x.id === p.id);
+                              return (
+                                <div key={p.id}
+                                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 hover:border-border transition-colors bg-background">
+                                  <div className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color }} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate" style={{ fontFamily: "'Manrope', sans-serif" }}>{p.name}</p>
+                                    <p className="text-xs text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>
+                                      {p.type === "hourly" ? `$${p.rate}/hr` : `$${p.rate} fixed`}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button type="button"
+                                      onClick={() => setEditingProject({ id: p.id, name: p.name, rate: p.rate, color: p.color, type: p.type as "hourly" | "fixed" })}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button type="button"
+                                      onClick={() => setDeleteProjectId(p.id)}
+                                      data-testid={`button-delete-project-${globalIndex}`}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-        <TabsContent value="general" className="space-y-4 md:space-y-6">
-          <Card>
-            <CardHeader className="p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg md:text-xl">Project Configuration</CardTitle>
-                  <CardDescription className="text-xs md:text-sm mt-1">Manage your freelance projects and rates. Organize by hourly or fixed-price contracts.</CardDescription>
-                </div>
-                <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="whitespace-nowrap">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Project
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Project</DialogTitle>
-                      <DialogDescription>
-                        Create a new project with a custom rate and color.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...newProjectForm}>
-                      <form onSubmit={newProjectForm.handleSubmit(onNewProjectSubmit)} className="space-y-4">
-                        <FormField
-                          control={newProjectForm.control}
-                          name="name"
-                          render={({ field }) => (
+                <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                  <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
+                    <DialogTrigger asChild>
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-semibold border border-primary/30 text-primary hover:bg-primary/5 transition-colors"
+                        style={{ fontFamily: "'Manrope', sans-serif" }}
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Project
+                      </motion.button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Project</DialogTitle>
+                        <DialogDescription>Create a new project with a custom rate and color.</DialogDescription>
+                      </DialogHeader>
+                      <Form {...newProjectForm}>
+                        <form onSubmit={newProjectForm.handleSubmit(onNewProjectSubmit)} className="space-y-4">
+                          <FormField control={newProjectForm.control} name="name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Project Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Client name or project" {...field} />
-                              </FormControl>
+                              <FormControl><Input placeholder="Client name or project" {...field} /></FormControl>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={newProjectForm.control}
-                          name="type"
-                          render={({ field }) => (
+                          )} />
+                          <FormField control={newProjectForm.control} name="type" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Contract Type</FormLabel>
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select type" />
-                                  </SelectTrigger>
-                                </FormControl>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   <SelectItem value="hourly">Hourly Rate</SelectItem>
                                   <SelectItem value="fixed">Fixed Price</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormDescription>
-                                {newProjectForm.watch("type") === "hourly" 
-                                  ? "You'll be paid based on hours logged" 
-                                  : "You'll be paid a fixed amount regardless of hours"}
+                                {newProjectForm.watch("type") === "hourly" ? "Paid based on hours logged" : "Fixed amount regardless of hours"}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={newProjectForm.control}
-                          name="rate"
-                          render={({ field }) => (
+                          )} />
+                          <FormField control={newProjectForm.control} name="rate" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>
-                                {newProjectForm.watch("type") === "fixed" ? "Total Contract Budget ($)" : "Hourly Rate ($)"}
-                              </FormLabel>
+                              <FormLabel>{newProjectForm.watch("type") === "fixed" ? "Contract Budget ($)" : "Hourly Rate ($)"}</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
                                   <Input type="number" step="0.01" className="pl-7" placeholder="25.00" {...field} />
                                 </div>
                               </FormControl>
-                              <FormDescription>
-                                {newProjectForm.watch("type") === "fixed" 
-                                  ? "Total budget for this fixed-price contract" 
-                                  : "Your hourly rate for this project"}
-                              </FormDescription>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={newProjectForm.control}
-                          name="color"
-                          render={({ field }) => (
+                          )} />
+                          <FormField control={newProjectForm.control} name="color" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Project Color</FormLabel>
                               <FormControl>
                                 <div className="flex gap-2 flex-wrap">
-                                  {PROJECT_COLORS.map((color) => (
-                                    <button
-                                      key={color}
-                                      type="button"
-                                      onClick={() => field.onChange(color)}
-                                      className={`w-8 h-8 rounded-full border-2 transition-all ${field.value === color ? 'border-primary scale-110' : 'border-transparent'
-                                        }`}
-                                      style={{ backgroundColor: color }}
-                                    />
+                                  {PROJECT_COLORS.map(c => (
+                                    <button key={c} type="button" onClick={() => field.onChange(c)}
+                                      className="w-7 h-7 rounded-full border-2 transition-all"
+                                      style={{ backgroundColor: c, borderColor: field.value === c ? "hsl(228,25%,12%)" : "transparent", transform: field.value === c ? "scale(1.2)" : "scale(1)" }} />
                                   ))}
                                 </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => setIsAddProjectOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button type="submit" disabled={createProject.isPending}>
-                            {createProject.isPending ? "Creating..." : "Create Project"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Form {...projectForm}>
-                <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="space-y-6">
-                  {projects.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">No projects yet</p>
-                        <p className="text-xs">Click "Add Project" to create your first project.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {/* Hourly Projects Section */}
-                      <ProjectSection 
-                        type="hourly" 
-                        projects={projectForm.watch("projects").filter(p => p.type === "hourly" || !p.type)}
-                        icon={<Clock className="w-5 h-5" />}
-                      />
+                          )} />
+                          <DialogFooter>
+                            <button type="button" onClick={() => setIsAddProjectOpen(false)}
+                              className="px-4 h-9 rounded-xl text-xs font-semibold border border-border hover:bg-muted transition-colors"
+                              style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              Cancel
+                            </button>
+                            <button type="submit" disabled={createProject.isPending}
+                              className="px-4 h-9 rounded-xl text-xs font-semibold text-[hsl(228,25%,9%)] transition-colors"
+                              style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)" }}>
+                              {createProject.isPending ? "Creating..." : "Create Project"}
+                            </button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
 
-                      {/* Fixed Projects Section */}
-                      <ProjectSection 
-                        type="fixed" 
-                        projects={projectForm.watch("projects").filter(p => p.type === "fixed")}
-                        icon={<Briefcase className="w-5 h-5" />}
-                      />
-                    </div>
-                  )}
-                  
                   {projects.length > 0 && (
-                    <div className="flex justify-end pt-6 border-t border-border">
-                      <Button type="submit" size="lg" data-testid="button-save-projects" className="gap-2">
-                        <Save className="w-4 h-4" />
-                        Save All Projects
-                      </Button>
-                    </div>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                      data-testid="button-save-projects"
+                      className="flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-semibold"
+                      style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}
+                    >
+                      <Save className="w-3.5 h-3.5" /> Save Projects
+                    </motion.button>
                   )}
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </div>
+              </form>
+            </Form>
+          </SectionCard>
+        </motion.div>
+      )}
 
-        <TabsContent value="financials" className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <Card>
-              <CardHeader className="p-4 md:p-6">
-                <CardTitle className="text-lg md:text-xl">Deductions & Taxes</CardTitle>
-                <CardDescription className="text-xs md:text-sm mt-1">Set calculation logic for net income.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 md:p-6">
-                <Form {...deductionForm}>
-                  <form onSubmit={deductionForm.handleSubmit(onDeductionSubmit)} className="space-y-4">
-                    <FormField
-                      control={deductionForm.control}
-                      name="serviceFee"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Service Fee (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.1" {...field} data-testid="input-service-fee" />
-                          </FormControl>
-                          <FormDescription>Platform/Service fee on gross amount.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={deductionForm.control}
-                      name="tds"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>TDS (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-tds" />
-                          </FormControl>
-                          <FormDescription>Tax Deducted at Source on gross.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={deductionForm.control}
-                      name="gst"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>GST on Service Fee (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.1" {...field} data-testid="input-gst" />
-                          </FormControl>
-                          <FormDescription>GST charged on the service fee amount.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={deductionForm.control}
-                      name="transferFee"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Transfer Fee ($)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-transfer-fee" />
-                          </FormControl>
-                          <FormDescription>Flat fee deducted during transfer.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" data-testid="button-save-deductions">Save Deductions</Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
+      {/* ── Financials tab ── */}
+      {tab === "financials" && (
+        <motion.div {...fade(2)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Deductions */}
+          <SectionCard title="Deductions & Taxes" description="Set calculation logic for net income.">
+            <Form {...deductionForm}>
+              <form onSubmit={deductionForm.handleSubmit(onDeductionSubmit)} className="space-y-4">
+                {[
+                  { name: "serviceFee" as const, label: "Service Fee (%)", desc: "Platform fee on gross amount.", testid: "input-service-fee", step: "0.1" },
+                  { name: "tds" as const, label: "TDS (%)", desc: "Tax Deducted at Source on gross.", testid: "input-tds", step: "0.01" },
+                  { name: "gst" as const, label: "GST on Service Fee (%)", desc: "GST charged on the service fee.", testid: "input-gst", step: "0.1" },
+                  { name: "transferFee" as const, label: "Transfer Fee ($)", desc: "Flat fee deducted during transfer.", testid: "input-transfer-fee", step: "0.01" },
+                ].map(f => (
+                  <FormField key={f.name} control={deductionForm.control} name={f.name} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>{f.label}</FormLabel>
+                      <FormControl>
+                        <Input type="number" step={f.step} {...field} data-testid={f.testid}
+                          className="h-10 rounded-xl text-sm" />
+                      </FormControl>
+                      <FormDescription className="text-xs">{f.desc}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                ))}
+                <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  data-testid="button-save-deductions"
+                  className="w-full h-10 rounded-xl text-xs font-semibold"
+                  style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}>
+                  Save Deductions
+                </motion.button>
+              </form>
+            </Form>
+          </SectionCard>
 
-            <Card>
-              <CardHeader className="p-4 md:p-6">
-                <CardTitle className="text-lg md:text-xl">Currency Conversion</CardTitle>
-                <CardDescription className="text-xs md:text-sm mt-1">Set the USD to INR exchange rate.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 md:p-6">
-                <Form {...currencyForm}>
-                  <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-6">
-                    <div className="bg-primary/5 p-6 rounded-xl text-center">
-                      <p className="text-sm text-muted-foreground mb-2">Current Rate</p>
-                      <div className="text-4xl font-bold font-heading text-primary">
-                        ₹{currency?.usdToInr || 0}
+          {/* Currency */}
+          <SectionCard title="Currency Conversion" description="Set the USD to INR exchange rate.">
+            <Form {...currencyForm}>
+              <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-5">
+                {/* Rate display */}
+                <div className="rounded-xl p-5 text-center" style={{ background: "hsl(38,92%,50%,0.06)", border: "1px solid hsl(38,92%,50%,0.15)" }}>
+                  <p className="text-xs text-muted-foreground mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>Current Rate</p>
+                  <p className="text-4xl font-bold text-primary" style={{ fontFamily: "'Syne', sans-serif" }}>
+                    ₹{currency?.usdToInr || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    1 USD = {currency?.usdToInr || 0} INR
+                  </p>
+                </div>
+
+                <FormField control={currencyForm.control} name="usdToInr" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Manual Exchange Rate</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">₹</span>
+                        <Input type="number" step="0.01" className="pl-7 h-10 rounded-xl" {...field} data-testid="input-exchange-rate" />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">1 USD = {currency?.usdToInr || 0} INR</p>
-                    </div>
+                    </FormControl>
+                    <FormDescription className="text-xs">Update manually based on current market rates.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-                    <FormField
-                      control={currencyForm.control}
-                      name="usdToInr"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Manual Exchange Rate</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2.5 text-muted-foreground">₹</span>
-                              <Input type="number" step="0.01" className="pl-8" {...field} data-testid="input-exchange-rate" />
-                            </div>
-                          </FormControl>
-                          <FormDescription>
-                            Update this manually based on current market rates.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={fetchLiveExchangeRate}
-                        disabled={isFetchingRate}
-                        className="flex-1"
-                        data-testid="button-fetch-rate"
-                      >
-                        <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingRate ? 'animate-spin' : ''}`} />
-                        {isFetchingRate ? 'Fetching...' : 'Fetch Live Rate'}
-                      </Button>
-                      <Button
-                        type="submit"
-                        variant="secondary"
-                        className="flex-1"
-                        data-testid="button-save-currency"
-                      >
-                        Update Rate
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+                <div className="flex gap-2">
+                  <motion.button type="button" onClick={fetchLiveExchangeRate} disabled={isFetchingRate}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                    data-testid="button-fetch-rate"
+                    className="flex-1 h-10 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-border hover:bg-muted transition-colors"
+                    style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <RefreshCw className={cn("w-3.5 h-3.5", isFetchingRate && "animate-spin")} />
+                    {isFetchingRate ? "Fetching..." : "Fetch Live Rate"}
+                  </motion.button>
+                  <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                    data-testid="button-save-currency"
+                    className="flex-1 h-10 rounded-xl text-xs font-semibold"
+                    style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}>
+                    Update Rate
+                  </motion.button>
+                </div>
+              </form>
+            </Form>
+          </SectionCard>
+        </motion.div>
+      )}
 
-        <TabsContent value="data" className="space-y-4 md:space-y-6">
-          <Card>
-            <CardHeader className="p-4 md:p-6">
-              <CardTitle className="text-lg md:text-xl">Backup & Restore</CardTitle>
-              <CardDescription className="text-xs md:text-sm mt-1">Export your data to JSON.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 space-y-4">
-              <div className="flex flex-col gap-3">
-                <Button onClick={handleExport} className="w-full" data-testid="button-export">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Data
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* ── Data tab ── */}
+      {tab === "data" && (
+        <motion.div {...fade(2)}>
+          <SectionCard title="Backup & Restore" description="Export your data as JSON for safekeeping.">
+            <motion.button onClick={handleExport}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              data-testid="button-export"
+              className="flex items-center gap-2 px-5 h-10 rounded-xl text-xs font-semibold border border-border hover:bg-muted transition-colors"
+              style={{ fontFamily: "'Manrope', sans-serif" }}>
+              <Download className="w-3.5 h-3.5" /> Export Data
+            </motion.button>
+          </SectionCard>
+        </motion.div>
+      )}
 
       {/* Edit Project Dialog */}
-      <Dialog open={editingProject !== null} onOpenChange={(open) => !open && setEditingProject(null)}>
+      <Dialog open={editingProject !== null} onOpenChange={open => !open && setEditingProject(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
@@ -657,103 +492,80 @@ export default function Settings() {
           </DialogHeader>
           {editingProject && (
             <div className="space-y-4 py-2">
-              {/* Name */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Project Name</label>
-                <Input
-                  value={editingProject.name}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>Project Name</label>
+                <Input value={editingProject.name}
                   onChange={e => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
-                  placeholder="Project name"
-                />
+                  placeholder="Project name" className="rounded-xl h-10" />
               </div>
-
-              {/* Rate */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>
                   {editingProject.type === "hourly" ? "Hourly Rate ($)" : "Fixed Budget ($)"}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="pl-7"
+                  <Input type="number" step="0.01" className="pl-7 rounded-xl h-10"
                     value={editingProject.rate}
-                    onChange={e => setEditingProject(p => p ? { ...p, rate: parseFloat(e.target.value) || 0 } : null)}
-                    placeholder="0.00"
-                  />
+                    onChange={e => setEditingProject(p => p ? { ...p, rate: parseFloat(e.target.value) || 0 } : null)} />
                 </div>
               </div>
-
-              {/* Type */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Project Type</label>
-                <select
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>Project Type</label>
+                <select className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-background h-10"
                   value={editingProject.type}
-                  onChange={e => setEditingProject(p => p ? { ...p, type: e.target.value as "hourly" | "fixed" } : null)}
-                >
+                  onChange={e => setEditingProject(p => p ? { ...p, type: e.target.value as "hourly" | "fixed" } : null)}>
                   <option value="hourly">Hourly</option>
                   <option value="fixed">Fixed Price</option>
                 </select>
               </div>
-
-              {/* Color */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Color</label>
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>Color</label>
                 <div className="flex gap-2 flex-wrap">
                   {PROJECT_COLORS.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setEditingProject(p => p ? { ...p, color: c } : null)}
+                    <button key={c} type="button" onClick={() => setEditingProject(p => p ? { ...p, color: c } : null)}
                       className="w-7 h-7 rounded-full border-2 transition-all"
-                      style={{
-                        backgroundColor: c,
-                        borderColor: editingProject.color === c ? '#000' : 'transparent',
-                        transform: editingProject.color === c ? 'scale(1.2)' : 'scale(1)',
-                      }}
-                    />
+                      style={{ backgroundColor: c, borderColor: editingProject.color === c ? "hsl(228,25%,12%)" : "transparent", transform: editingProject.color === c ? "scale(1.2)" : "scale(1)" }} />
                   ))}
                 </div>
               </div>
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
-            <Button
+            <button onClick={() => setEditingProject(null)}
+              className="px-4 h-9 rounded-xl text-xs font-semibold border border-border hover:bg-muted transition-colors"
+              style={{ fontFamily: "'Manrope', sans-serif" }}>
+              Cancel
+            </button>
+            <button
               onClick={async () => {
                 if (!editingProject) return;
                 try {
                   await updateProject.mutateAsync({ id: editingProject.id, data: { name: editingProject.name, rate: editingProject.rate, color: editingProject.color, type: editingProject.type } });
-                  toast({ title: "Project updated", description: `"${editingProject.name}" saved successfully.` });
+                  toast({ title: "Project updated", description: `"${editingProject.name}" saved.` });
                   setEditingProject(null);
                 } catch {
                   toast({ title: "Error", description: "Failed to update project.", variant: "destructive" });
                 }
               }}
               disabled={updateProject.isPending}
-            >
+              className="px-4 h-9 rounded-xl text-xs font-semibold"
+              style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}>
               {updateProject.isPending ? "Saving..." : "Save Changes"}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Project Confirmation Dialog */}
-      <AlertDialog open={deleteProjectId !== null} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
+      {/* Delete Confirm */}
+      <AlertDialog open={deleteProjectId !== null} onOpenChange={open => !open && setDeleteProjectId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this project and all associated time entries. This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This will permanently delete the project and all associated time entries. This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

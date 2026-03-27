@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, startOfMonth, endOfMonth, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, isAfter, isBefore, startOfDay, endOfDay, subDays, subMonths, startOfYear } from "date-fns";
 import { useWithdrawals, useCreateWithdrawal, useUpdateWithdrawalStatus, useDeleteWithdrawal, useTimeEntries, useCurrencySettings } from "@/lib/hooks";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp, Upload } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp, Upload, X, SlidersHorizontal } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,9 +61,43 @@ export default function History() {
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [dateFrom, setDateFrom] = useState<string>("");
     const [dateTo, setDateTo] = useState<string>("");
+    const [activePreset, setActivePreset] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const DATE_PRESETS = [
+      { label: "All Time",     value: "all" },
+      { label: "This Month",   value: "this_month" },
+      { label: "Last Month",   value: "last_month" },
+      { label: "Last 3 Mo.",   value: "last_3mo" },
+      { label: "This Year",    value: "this_year" },
+      { label: "Last 30 Days", value: "last_30" },
+      { label: "Last 90 Days", value: "last_90" },
+      { label: "Custom",       value: "custom" },
+    ];
+
+    function applyPreset(preset: string) {
+      setActivePreset(preset);
+      setCurrentPage(1);
+      const today = new Date();
+      const fmt = (d: Date) => format(d, "yyyy-MM-dd");
+      switch (preset) {
+        case "all":        setDateFrom(""); setDateTo(""); break;
+        case "this_month": setDateFrom(fmt(startOfMonth(today))); setDateTo(fmt(today)); break;
+        case "last_month": {
+          const lm = subMonths(today, 1);
+          setDateFrom(fmt(startOfMonth(lm)));
+          setDateTo(fmt(endOfMonth(lm)));
+          break;
+        }
+        case "last_3mo":   setDateFrom(fmt(subMonths(today, 3)));  setDateTo(fmt(today)); break;
+        case "this_year":  setDateFrom(fmt(startOfYear(today)));   setDateTo(fmt(today)); break;
+        case "last_30":    setDateFrom(fmt(subDays(today, 30)));   setDateTo(fmt(today)); break;
+        case "last_90":    setDateFrom(fmt(subDays(today, 90)));   setDateTo(fmt(today)); break;
+        case "custom":     break; // user fills manually
+      }
+    }
 
     // Calculate Available Balance
     const totalEarnings = timeEntries.reduce((sum, entry) => sum + (entry.netUsd || 0), 0);
@@ -570,82 +603,130 @@ export default function History() {
                 </CardContent>
             </Card>
 
-            {/* Filters & Controls */}
-            <Card className="shadow-sm">
-                <CardHeader>
-                    <CardTitle>Filters & Search</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium">Status</Label>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value as any);
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="received">Received</option>
-                                <option value="pending">Pending</option>
-                            </select>
+            {/* ── Filters ── */}
+            <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold" style={{ fontFamily: "'Syne', sans-serif" }}>Filters</span>
+                    {(dateFrom || dateTo || statusFilter !== "all") && (
+                        <button
+                            onClick={() => {
+                                setDateFrom(""); setDateTo("");
+                                setStatusFilter("all");
+                                setActivePreset("all");
+                                setCurrentPage(1);
+                            }}
+                            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            style={{ fontFamily: "'Manrope', sans-serif" }}
+                        >
+                            <X className="w-3 h-3" /> Clear all
+                        </button>
+                    )}
+                </div>
+
+                <div className="px-5 py-4 space-y-4">
+                    {/* Date presets */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>
+                            Date Range
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {DATE_PRESETS.map(p => (
+                                <button
+                                    key={p.value}
+                                    onClick={() => applyPreset(p.value)}
+                                    className="px-3 h-7 rounded-lg text-xs font-semibold transition-all duration-150"
+                                    style={{
+                                        fontFamily: "'Manrope', sans-serif",
+                                        background: activePreset === p.value ? "hsl(38,92%,50%)" : "hsl(220,15%,94%)",
+                                        color: activePreset === p.value ? "hsl(228,25%,9%)" : "hsl(220,10%,45%)",
+                                    }}
+                                >
+                                    {p.value === "custom" && <CalendarIcon className="inline w-3 h-3 mr-1 -mt-0.5" />}
+                                    {p.label}
+                                </button>
+                            ))}
                         </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium">Sort By</Label>
-                            <select
-                                value={sortField}
-                                onChange={(e) => setSortField(e.target.value as SortField)}
-                                className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm"
-                            >
-                                <option value="date">Date</option>
-                                <option value="amount">Amount</option>
-                                <option value="status">Status</option>
-                            </select>
+                        {/* Custom date inputs */}
+                        {activePreset === "custom" && (
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/60 bg-background">
+                                    <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                    <input
+                                        type="date"
+                                        value={dateFrom}
+                                        onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                                        className="text-xs border-none outline-none bg-transparent text-foreground"
+                                        style={{ fontFamily: "'DM Mono', monospace" }}
+                                    />
+                                    <span className="text-muted-foreground text-xs">→</span>
+                                    <input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                                        className="text-xs border-none outline-none bg-transparent text-foreground"
+                                        style={{ fontFamily: "'DM Mono', monospace" }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Status + Sort row */}
+                    <div className="flex flex-wrap gap-4 pt-1 border-t border-border/40">
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>Status</p>
+                            <div className="flex gap-1">
+                                {["all", "received", "pending"].map(s => (
+                                    <button
+                                        key={s}
+                                        onClick={() => { setStatusFilter(s as any); setCurrentPage(1); }}
+                                        className="px-3 h-7 rounded-lg text-xs font-semibold capitalize transition-all duration-150"
+                                        style={{
+                                            fontFamily: "'Manrope', sans-serif",
+                                            background: statusFilter === s ? "hsl(228,25%,12%)" : "hsl(220,15%,94%)",
+                                            color: statusFilter === s ? "white" : "hsl(220,10%,45%)",
+                                        }}
+                                    >
+                                        {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium">Order</Label>
-                            <select
-                                value={sortOrder}
-                                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                                className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm"
-                            >
-                                <option value="desc">Descending</option>
-                                <option value="asc">Ascending</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium">From</Label>
-                            <Input
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => {
-                                    setDateFrom(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="text-sm"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium">To</Label>
-                            <Input
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => {
-                                    setDateTo(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="text-sm"
-                            />
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>Sort By</p>
+                            <div className="flex gap-1">
+                                {[
+                                    { v: "date",   l: "Date" },
+                                    { v: "amount", l: "Amount" },
+                                    { v: "status", l: "Status" },
+                                ].map(s => (
+                                    <button
+                                        key={s.v}
+                                        onClick={() => {
+                                            if (sortField === s.v) setSortOrder(o => o === "asc" ? "desc" : "asc");
+                                            else { setSortField(s.v as SortField); setSortOrder("desc"); }
+                                        }}
+                                        className="px-3 h-7 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all duration-150"
+                                        style={{
+                                            fontFamily: "'Manrope', sans-serif",
+                                            background: sortField === s.v ? "hsl(228,25%,12%)" : "hsl(220,15%,94%)",
+                                            color: sortField === s.v ? "white" : "hsl(220,10%,45%)",
+                                        }}
+                                    >
+                                        {s.l}
+                                        {sortField === s.v && (
+                                            <ArrowUpDown className="w-3 h-3 opacity-70" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             {/* Withdrawals List */}
             <Card className="shadow-sm">

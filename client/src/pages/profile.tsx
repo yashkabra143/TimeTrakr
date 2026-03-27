@@ -2,460 +2,366 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
+import { motion } from "framer-motion";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, User, Mail, Upload, Calendar, Lock, X } from "lucide-react";
-import { Link } from "wouter";
+import { User, Mail, Upload, Calendar, Lock, X, Camera } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { cn } from "@/lib/utils";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const profileSchema = z.object({
-    fullName: z.string().optional(),
-    email: z.string().email("Invalid email address").optional().or(z.literal("")),
-    dateOfBirth: z.string().optional().or(z.literal("")),
-    profilePicture: z.string().optional().or(z.literal("")),
+  fullName:       z.string().optional(),
+  email:          z.string().email("Invalid email").optional().or(z.literal("")),
+  dateOfBirth:    z.string().optional().or(z.literal("")),
+  profilePicture: z.string().optional().or(z.literal("")),
 });
 
 const changePasswordSchema = z.object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-});
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword:     z.string().min(6, "At least 6 characters"),
+  confirmPassword: z.string().min(1, "Please confirm"),
+}).refine(d => d.newPassword === d.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
-type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+type PasswordFormValues = z.infer<typeof changePasswordSchema>;
+
+const fade = (i = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } },
+});
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        style={{ fontFamily: "'Manrope', sans-serif" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
 export default function Profile() {
-    const { toast } = useToast();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const initializedRef = useRef(false);
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const initializedRef = useRef(false);
 
-    const user = useAuthStore((state) => state.user);
-    const updateUser = useAuthStore((state) => state.login); // Using login to update user state
+  const user = useAuthStore(s => s.user);
+  const updateUser = useAuthStore(s => s.login);
 
-    const [previewImage, setPreviewImage] = useState<string>("");
+  const [previewImage, setPreviewImage] = useState("");
 
-    const form = useForm<ProfileFormValues>({
-        resolver: zodResolver(profileSchema),
-        defaultValues: {
-            fullName: "",
-            email: "",
-            dateOfBirth: "",
-            profilePicture: "",
-        },
-    });
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { fullName: "", email: "", dateOfBirth: "", profilePicture: "" },
+  });
 
-    const passwordForm = useForm<ChangePasswordFormValues>({
-        resolver: zodResolver(changePasswordSchema),
-        defaultValues: {
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-        },
-    });
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
 
-    const onProfileSubmit = async (data: ProfileFormValues) => {
-        if (!user) {
-            toast({ variant: "destructive", title: "Error", description: "User not found. Please log in." });
-            return;
-        }
-        try {
-            const res = await fetch("/api/user", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    currentUsername: user.username,
-                    username: data.fullName ? undefined : user.username, // Only send username if we want to update it (not implemented in UI yet, but good for safety)
-                    ...data,
-                }),
-            });
+  const onProfileSubmit = async (data: ProfileFormValues) => {
+    if (!user) { toast({ variant: "destructive", title: "Error", description: "Not logged in." }); return; }
+    try {
+      const res = await fetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentUsername: user.username, username: data.fullName ? undefined : user.username, ...data }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      localStorage.setItem("user", JSON.stringify(updated.user));
+      updateUser(updated.user);
+      toast({ title: "Profile updated" });
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to update profile." });
+    }
+  };
 
-            if (!res.ok) {
-                throw new Error("Failed to update profile");
-            }
+  const onPasswordSubmit = async (data: PasswordFormValues) => {
+    if (!user) { toast({ variant: "destructive", title: "Error", description: "Not logged in." }); return; }
+    try {
+      const res = await fetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, currentPassword: data.currentPassword, newPassword: data.newPassword }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      toast({ title: "Password updated" });
+      passwordForm.reset();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Something went wrong." });
+    }
+  };
 
-            const updatedUser = await res.json();
-
-            localStorage.setItem("user", JSON.stringify(updatedUser.user));
-            updateUser(updatedUser.user);
-
-            toast({
-                title: "Success",
-                description: "Profile updated successfully",
-            });
-        } catch (error) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to update profile",
-            });
-        }
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast({ variant: "destructive", title: "Invalid file type" }); return; }
+    if (file.size > MAX_FILE_SIZE) { toast({ variant: "destructive", title: "File too large", description: "Max 5 MB." }); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const b64 = ev.target?.result as string;
+      setPreviewImage(b64);
+      form.setValue("profilePicture", b64);
     };
+    reader.readAsDataURL(file);
+  };
 
-    const onPasswordSubmit = async (data: ChangePasswordFormValues) => {
-        if (!user) {
-            toast({ variant: "destructive", title: "Error", description: "User not found. Please log in." });
-            return;
-        }
-        try {
-            const res = await fetch("/api/change-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    username: user.username,
-                    currentPassword: data.currentPassword,
-                    newPassword: data.newPassword,
-                }),
-            });
+  const removeImage = () => {
+    setPreviewImage("");
+    form.setValue("profilePicture", "");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.message || "Failed to update password");
-            }
+  useEffect(() => {
+    if (!user?.username || initializedRef.current) return;
+    initializedRef.current = true;
+    fetch(`/api/users/${user.username}`).then(r => r.json()).then(d => {
+      updateUser(d.user);
+      form.reset({ fullName: d.user.fullName || "", email: d.user.email || "", dateOfBirth: d.user.dateOfBirth || "", profilePicture: d.user.profilePicture || "" });
+      setPreviewImage(d.user.profilePicture || "");
+    }).catch(() => {});
+  }, [user?.username]);
 
-            toast({
-                title: "Success",
-                description: "Password updated successfully",
-            });
-            passwordForm.reset();
-        } catch (error) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: error instanceof Error ? error.message : "Something went wrong",
-            });
-        }
-    };
+  const displayName = user?.fullName || user?.username || "User";
+  const initial = displayName.charAt(0).toUpperCase();
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+  return (
+    <div className="max-w-4xl mx-auto space-y-7 pb-12">
 
-        // Validate file type
-        if (!file.type.startsWith("image/")) {
-            toast({
-                variant: "destructive",
-                title: "Invalid file type",
-                description: "Please upload an image file",
-            });
-            return;
-        }
-
-        // Validate file size
-        if (file.size > MAX_FILE_SIZE) {
-            toast({
-                variant: "destructive",
-                title: "File too large",
-                description: `Image must be less than 5 MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-            });
-            return;
-        }
-
-        // Convert to base64
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const base64String = event.target?.result as string;
-            setPreviewImage(base64String);
-            form.setValue("profilePicture", base64String);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const removeImage = () => {
-        setPreviewImage("");
-        form.setValue("profilePicture", "");
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    };
-
-    useEffect(() => {
-        const fetchUserData = async () => {
-            if (user?.username) {
-                try {
-                    const res = await fetch(`/api/users/${user.username}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        updateUser(data.user); // Update store with fresh data
-
-                        // Update form values
-                        form.reset({
-                            fullName: data.user.fullName || "",
-                            email: data.user.email || "",
-                            dateOfBirth: data.user.dateOfBirth || "",
-                            profilePicture: data.user.profilePicture || "",
-                        });
-                        setPreviewImage(data.user.profilePicture || "");
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch user data:", error);
-                }
-            }
-        };
-
-        if (user && !initializedRef.current) {
-            initializedRef.current = true;
-            fetchUserData();
-        }
-    }, [user?.username]); // Re-run if username changes (e.g. login)
-
-    // if (!user) {
-    //     return (
-    //         <div className="flex items-center justify-center min-h-screen">
-    //             <p className="text-muted-foreground">Loading profile...</p>
-    //         </div>
-    //     );
-    // }
-
-    return (
-        <div className="container max-w-4xl py-8 space-y-8">
-            <div className="flex items-center gap-4">
-                <Link href="/">
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                </Link>
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
-                    <p className="text-muted-foreground">Manage your account settings and preferences.</p>
-                </div>
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-[1fr_300px]">
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Personal Information</CardTitle>
-                            <CardDescription>Update your personal details.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Form {...form}>
-                                <form onSubmit={form.handleSubmit(onProfileSubmit)} className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="fullName"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Full Name</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <User className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                        <Input placeholder="John Doe" className="pl-8" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="email"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Email</FormLabel>
-                                                    <FormControl>
-                                                        <div className="relative">
-                                                            <Mail className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                            <Input placeholder="john@example.com" className="pl-8" {...field} />
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="dateOfBirth"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Date of Birth</FormLabel>
-                                                    <FormControl>
-                                                        <div className="relative cursor-pointer">
-                                                            <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                                            <Input type="date" className="pl-8 [&::-webkit-calendar-picker-indicator]:opacity-0 cursor-pointer" {...field} />
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <FormField
-                                        control={form.control}
-                                        name="profilePicture"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Profile Picture</FormLabel>
-                                                <FormControl>
-                                                    <div className="space-y-4">
-                                                        <div className="flex items-center gap-4">
-                                                            <input
-                                                                ref={fileInputRef}
-                                                                type="file"
-                                                                accept="image/*"
-                                                                onChange={handleFileUpload}
-                                                                className="hidden"
-                                                            />
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                onClick={() => fileInputRef.current?.click()}
-                                                                className="w-full justify-start"
-                                                            >
-                                                                <Upload className="h-4 w-4 mr-2" />
-                                                                Choose Image
-                                                            </Button>
-                                                        </div>
-                                                        {previewImage && (
-                                                            <div className="relative w-32 h-32 mx-auto">
-                                                                <img
-                                                                    src={previewImage}
-                                                                    alt="Preview"
-                                                                    className="w-full h-full object-cover rounded-lg"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={removeImage}
-                                                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                                                                >
-                                                                    <X className="h-3 w-3" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </FormControl>
-                                                <FormDescription>
-                                                    Upload an image file. Max size: 5 MB
-                                                </FormDescription>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <div className="flex justify-end">
-                                        <Button type="submit" disabled={form.formState.isSubmitting}>
-                                            {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Change Password</CardTitle>
-                            <CardDescription>Update your password to keep your account secure.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Form {...passwordForm}>
-                                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                                    <FormField
-                                        control={passwordForm.control}
-                                        name="currentPassword"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Current Password</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <Lock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                        <Input type="password" placeholder="••••••" className="pl-8" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <FormField
-                                            control={passwordForm.control}
-                                            name="newPassword"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>New Password</FormLabel>
-                                                    <FormControl>
-                                                        <div className="relative">
-                                                            <Lock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                            <Input type="password" placeholder="••••••" className="pl-8" {...field} />
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={passwordForm.control}
-                                            name="confirmPassword"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Confirm Password</FormLabel>
-                                                    <FormControl>
-                                                        <div className="relative">
-                                                            <Lock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                            <Input type="password" placeholder="••••••" className="pl-8" {...field} />
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
-                                            {passwordForm.formState.isSubmitting ? "Updating..." : "Update Password"}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Profile Picture</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col items-center gap-4">
-                            {previewImage ? (
-                                <div className="relative w-32 h-32">
-                                    <img
-                                        src={previewImage}
-                                        alt="Profile"
-                                        className="w-full h-full object-cover rounded-full border-4 border-muted"
-                                    />
-                                </div>
-                            ) : (
-                                <Avatar className="h-32 w-32">
-                                    <AvatarFallback className="text-2xl">
-                                        {user?.fullName ? user.fullName.charAt(0).toUpperCase() : (user?.username?.charAt(0).toUpperCase() || "U")}
-                                    </AvatarFallback>
-                                </Avatar>
-                            )}
-                            <div className="text-center space-y-1">
-                                <p className="font-medium">{user?.fullName || user?.username}</p>
-                                <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+      {/* Header */}
+      <motion.div {...fade(0)} className="flex items-center gap-4">
+        {/* Avatar */}
+        <div className="relative shrink-0">
+          <div className="w-14 h-14 rounded-2xl overflow-hidden ring-2 ring-primary/20">
+            {previewImage ? (
+              <img src={previewImage} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xl font-bold"
+                style={{ background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)", fontFamily: "'Syne', sans-serif" }}>
+                {initial}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2 border-background transition-colors hover:bg-primary"
+            style={{ background: "hsl(38,92%,50%)" }}
+          >
+            <Camera className="w-3 h-3" style={{ color: "hsl(228,25%,9%)" }} />
+          </button>
         </div>
-    );
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>Account</p>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>{displayName}</h1>
+          <p className="text-sm text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>{user?.email || "No email set"}</p>
+        </div>
+      </motion.div>
+
+      <div className="grid gap-5 md:grid-cols-[1fr_280px]">
+        {/* Left column */}
+        <div className="space-y-5">
+
+          {/* Personal Info */}
+          <motion.div {...fade(1)} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+            <div className="px-6 pt-5 pb-4 border-b border-border/40">
+              <h2 className="text-sm font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>Personal Information</h2>
+              <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "'Manrope', sans-serif" }}>Update your personal details.</p>
+            </div>
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onProfileSubmit)} className="space-y-5">
+                  <FormField control={form.control} name="fullName" render={({ field }) => (
+                    <FormItem>
+                      <FieldRow label="Full Name">
+                        <FormControl>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input placeholder="John Doe" className="pl-9 h-10 rounded-xl" {...field} />
+                          </div>
+                        </FormControl>
+                      </FieldRow>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="email" render={({ field }) => (
+                      <FormItem>
+                        <FieldRow label="Email">
+                          <FormControl>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input placeholder="john@example.com" className="pl-9 h-10 rounded-xl" {...field} />
+                            </div>
+                          </FormControl>
+                        </FieldRow>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+                      <FormItem>
+                        <FieldRow label="Date of Birth">
+                          <FormControl>
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                              <Input type="date" className="pl-9 h-10 rounded-xl [&::-webkit-calendar-picker-indicator]:opacity-0" {...field} />
+                            </div>
+                          </FormControl>
+                        </FieldRow>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {/* Profile picture upload */}
+                  <FormField control={form.control} name="profilePicture" render={() => (
+                    <FormItem>
+                      <FieldRow label="Profile Picture">
+                        <FormControl>
+                          <div className="space-y-3">
+                            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            <button type="button" onClick={() => fileInputRef.current?.click()}
+                              className="flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-semibold border border-border hover:bg-muted transition-colors w-full justify-center"
+                              style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              <Upload className="w-3.5 h-3.5" /> Choose Image
+                            </button>
+                            {previewImage && (
+                              <div className="relative w-20 h-20 mx-auto">
+                                <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-xl" />
+                                <button type="button" onClick={removeImage}
+                                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center bg-destructive text-white">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                      </FieldRow>
+                      <FormDescription className="text-xs">Max size: 5 MB</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <div className="flex justify-end pt-2">
+                    <motion.button type="submit" disabled={form.formState.isSubmitting}
+                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                      className="px-5 h-10 rounded-xl text-xs font-semibold"
+                      style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}>
+                      {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
+                    </motion.button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          </motion.div>
+
+          {/* Change Password */}
+          <motion.div {...fade(2)} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+            <div className="px-6 pt-5 pb-4 border-b border-border/40">
+              <h2 className="text-sm font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>Change Password</h2>
+              <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "'Manrope', sans-serif" }}>Keep your account secure.</p>
+            </div>
+            <div className="p-6">
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                  <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => (
+                    <FormItem>
+                      <FieldRow label="Current Password">
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input type="password" placeholder="••••••" className="pl-9 h-10 rounded-xl" {...field} />
+                          </div>
+                        </FormControl>
+                      </FieldRow>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={passwordForm.control} name="newPassword" render={({ field }) => (
+                      <FormItem>
+                        <FieldRow label="New Password">
+                          <FormControl>
+                            <div className="relative">
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input type="password" placeholder="••••••" className="pl-9 h-10 rounded-xl" {...field} />
+                            </div>
+                          </FormControl>
+                        </FieldRow>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={passwordForm.control} name="confirmPassword" render={({ field }) => (
+                      <FormItem>
+                        <FieldRow label="Confirm Password">
+                          <FormControl>
+                            <div className="relative">
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input type="password" placeholder="••••••" className="pl-9 h-10 rounded-xl" {...field} />
+                            </div>
+                          </FormControl>
+                        </FieldRow>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <motion.button type="submit" disabled={passwordForm.formState.isSubmitting}
+                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                      className="px-5 h-10 rounded-xl text-xs font-semibold"
+                      style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(228,25%,12%)", color: "white" }}>
+                      {passwordForm.formState.isSubmitting ? "Updating..." : "Update Password"}
+                    </motion.button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Right column — avatar card */}
+        <motion.div {...fade(3)} className="space-y-5">
+          <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+            <div className="px-5 pt-5 pb-4 border-b border-border/40">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>Your Profile</h2>
+            </div>
+            <div className="p-5 flex flex-col items-center gap-4">
+              <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-primary/15 ring-offset-2 ring-offset-card">
+                {previewImage ? (
+                  <img src={previewImage} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-3xl font-bold"
+                    style={{ background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)", fontFamily: "'Syne', sans-serif" }}>
+                    {initial}
+                  </div>
+                )}
+              </div>
+              <div className="text-center space-y-0.5">
+                <p className="font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>{displayName}</p>
+                <p className="text-xs text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  @{user?.username}
+                </p>
+                {user?.email && (
+                  <p className="text-xs text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    {user.email}
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <Camera className="w-3.5 h-3.5" /> Change photo
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
 }

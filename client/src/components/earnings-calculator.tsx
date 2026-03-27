@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Calculator } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Calculator, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +8,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,9 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
 import { useProjects, useDeductions, useCurrencySettings } from "@/lib/hooks";
-import { cn } from "@/lib/utils";
 import { formatMinutesReadable } from "@shared/time";
 
 export function EarningsCalculator() {
@@ -36,21 +33,19 @@ export function EarningsCalculator() {
   const calculateEarnings = () => {
     if (!timeInput || !selectedProject || !deductions || !currency) return null;
 
-    // Direct decimal multiplication: 1.30 × rate = 9.10
     const hoursDecimal = parseFloat(String(timeInput)) || 0;
     if (hoursDecimal <= 0) return null;
 
     const rate = selectedProject.rate;
     const grossUsd = hoursDecimal * rate;
 
-    // Calculate deductions (transfer fee excluded — applies only at withdrawal)
     const serviceFeePercent = deductions.serviceFee || 0;
     const tdsPercent = deductions.tds || 0;
     const gstPercent = deductions.gst || 0;
 
     const serviceAmt = grossUsd * (serviceFeePercent / 100);
     const tdsAmt = grossUsd * (tdsPercent / 100);
-    const gstAmt = serviceAmt * (gstPercent / 100); // GST on service fee
+    const gstAmt = serviceAmt * (gstPercent / 100);
 
     const totalDeductions = serviceAmt + tdsAmt + gstAmt;
     const netUsd = Math.max(0, grossUsd - totalDeductions);
@@ -59,7 +54,6 @@ export function EarningsCalculator() {
     const grossInr = grossUsd * exchangeRate;
     const netInr = netUsd * exchangeRate;
 
-    // Time display: parse H.MM (1.30 → 1h 30m), separate from billing math
     const [hPart, mPart = "0"] = String(timeInput).split(".");
     const hInt = parseInt(hPart) || 0;
     const mInt = parseInt(mPart.padEnd(2, "0").slice(0, 2)) || 0;
@@ -89,32 +83,44 @@ export function EarningsCalculator() {
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
+        <motion.button
           onClick={() => setOpen(true)}
           title="Open earnings calculator"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-semibold border border-border/60 bg-card hover:bg-muted/50 transition-colors"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <Calculator className="w-4 h-4" />
           <span className="hidden sm:inline">Calculator</span>
-        </Button>
+        </motion.button>
 
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Earnings Calculator</DialogTitle>
-            <DialogDescription>
-              Calculate your earnings with deductions breakdown
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-0 gap-0">
+          {/* Dialog header */}
+          <div className="px-6 pt-6 pb-5 border-b border-border/60">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                  style={{ background: "hsl(38,92%,50%)" }}>
+                  <Calculator className="w-4 h-4" style={{ color: "hsl(228,25%,9%)" }} />
+                </div>
+                <DialogTitle className="text-lg font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  Earnings Calculator
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                Calculate your earnings with deductions breakdown
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-6">
-            {/* Input Section */}
+          <div className="px-6 py-5 space-y-5">
+            {/* Inputs */}
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="time-input">Hours Worked</Label>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  style={{ fontFamily: "'DM Mono', monospace" }}>Hours Worked</p>
                 <Input
-                  id="time-input"
                   type="number"
                   placeholder="1.30"
                   value={timeInput}
@@ -122,23 +128,27 @@ export function EarningsCalculator() {
                   min="0"
                   step="0.01"
                   inputMode="decimal"
-                  className="text-lg"
+                  className="h-10 rounded-xl text-base"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Enter as H.MM — 1.30 = 1 hr 30 mins · 2.45 = 2 hr 45 mins · 0.30 = 30 mins
+                <p className="text-xs text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  1.30 = 1 hr 30 min · 2.45 = 2 hr 45 min · 0.30 = 30 min
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="project">Project</Label>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  style={{ fontFamily: "'DM Mono', monospace" }}>Project</p>
                 <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                  <SelectTrigger id="project">
+                  <SelectTrigger className="h-10 rounded-xl">
                     <SelectValue placeholder="Select a project" />
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
-                        {project.name} (${project.rate}/hr)
+                        <span className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: project.color }} />
+                          {project.name} {project.type === "fixed" ? "(Fixed)" : `($${project.rate}/hr)`}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -146,88 +156,114 @@ export function EarningsCalculator() {
               </div>
             </div>
 
-            {/* Results Section */}
-            {result && (
-              <div className="space-y-4 pt-6 border-t border-border">
-                {/* Time Display */}
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Time · Billing</p>
-                  <p className="text-lg font-semibold">{result.timeDisplay}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+            {/* Results */}
+            {result ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-4 pt-4 border-t border-border/60"
+              >
+                {/* Time summary */}
+                <div className="rounded-xl p-3 text-center"
+                  style={{ background: "hsl(220,15%,97%)", border: "1px solid hsl(220,15%,90%)" }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1"
+                    style={{ fontFamily: "'DM Mono', monospace" }}>Time · Billing</p>
+                  <p className="text-base font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>
+                    {result.timeDisplay}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "'Manrope', sans-serif" }}>
                     {result.hoursDecimal} hrs × ${result.rate}/hr = ${result.grossUsd.toFixed(2)} gross
                   </p>
                 </div>
 
-                {/* Gross Earnings */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-accent/50">
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">Gross Earnings (USD)</p>
-                      <p className="text-2xl font-bold">${result.grossUsd.toFixed(2)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-accent/50">
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">Gross Earnings (INR)</p>
-                      <p className="text-2xl font-bold">₹{result.grossInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                    </CardContent>
-                  </Card>
+                {/* Gross grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-4"
+                    style={{ background: "hsl(38,92%,50%,0.08)", border: "1px solid hsl(38,92%,50%,0.2)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1"
+                      style={{ fontFamily: "'DM Mono', monospace" }}>Gross USD</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      ${result.grossUsd.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-4"
+                    style={{ background: "hsl(220,15%,97%)", border: "1px solid hsl(220,15%,90%)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1"
+                      style={{ fontFamily: "'DM Mono', monospace" }}>Gross INR</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      ₹{result.grossInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Deductions Breakdown */}
+                {/* Deductions */}
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">Deductions Breakdown</h3>
-                  <div className="space-y-2 bg-muted/50 rounded-lg p-4">
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Service Fee ({deductions?.serviceFee}%)</span>
-                      <span className="font-medium">${result.deductions.serviceFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span>TDS ({deductions?.tds}%)</span>
-                      <span className="font-medium">${result.deductions.tds.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span>GST ({deductions?.gst}% on service fee)</span>
-                      <span className="font-medium">${result.deductions.gst.toFixed(2)}</span>
-                    </div>
-                    <div className="border-t border-border pt-2 mt-2 flex justify-between items-center text-sm font-semibold">
-                      <span>Total Deductions</span>
-                      <span>${result.deductions.total.toFixed(2)}</span>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
+                    style={{ fontFamily: "'DM Mono', monospace" }}>Deductions Breakdown</p>
+                  <div className="rounded-xl overflow-hidden border border-border/60">
+                    {[
+                      { label: `Service Fee (${deductions?.serviceFee}%)`, value: result.deductions.serviceFee },
+                      { label: `TDS (${deductions?.tds}%)`, value: result.deductions.tds },
+                      { label: `GST (${deductions?.gst}% on service fee)`, value: result.deductions.gst },
+                    ].map((item, i) => (
+                      <div key={i} className="flex justify-between items-center px-4 py-2.5 border-b border-border/40 last:border-0"
+                        style={{ background: i % 2 === 0 ? "hsl(220,15%,98%)" : "white" }}>
+                        <span className="text-xs text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                          {item.label}
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums text-destructive"
+                          style={{ fontFamily: "'DM Mono', monospace" }}>
+                          −${item.value.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center px-4 py-3"
+                      style={{ background: "hsl(220,15%,95%)" }}>
+                      <span className="text-xs font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        Total Deductions
+                      </span>
+                      <span className="text-sm font-bold tabular-nums text-destructive"
+                        style={{ fontFamily: "'DM Mono', monospace" }}>
+                        −${result.deductions.total.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Net Earnings */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">Net Earnings (USD)</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                        ${result.netUsd.toFixed(2)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">Net Earnings (INR)</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                        ₹{result.netInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                      </p>
-                    </CardContent>
-                  </Card>
+                {/* Net earnings */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-4"
+                    style={{ background: "hsl(155,60%,38%,0.08)", border: "1px solid hsl(155,60%,38%,0.2)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1"
+                      style={{ fontFamily: "'DM Mono', monospace" }}>Net USD</p>
+                    <p className="text-2xl font-bold tabular-nums"
+                      style={{ fontFamily: "'Syne', sans-serif", color: "hsl(155,60%,38%)" }}>
+                      ${result.netUsd.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-4"
+                    style={{ background: "hsl(155,60%,38%,0.08)", border: "1px solid hsl(155,60%,38%,0.2)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1"
+                      style={{ fontFamily: "'DM Mono', monospace" }}>Net INR</p>
+                    <p className="text-2xl font-bold tabular-nums"
+                      style={{ fontFamily: "'Syne', sans-serif", color: "hsl(155,60%,38%)" }}>
+                      ₹{result.netInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Exchange Rate Info */}
-                <div className="text-xs text-muted-foreground text-center pt-2">
+                <p className="text-[10px] text-center text-muted-foreground"
+                  style={{ fontFamily: "'DM Mono', monospace" }}>
                   Exchange Rate: 1 USD = ₹{result.exchangeRate.toFixed(2)}
-                </div>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {!result && (
+                </p>
+              </motion.div>
+            ) : (
               <div className="py-8 text-center text-muted-foreground">
-                <p className="text-sm">Enter time (H.MM format) and select a project to see calculations</p>
+                <Calculator className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                <p className="text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  Enter time (H.MM format) and select a project to see calculations
+                </p>
               </div>
             )}
           </div>

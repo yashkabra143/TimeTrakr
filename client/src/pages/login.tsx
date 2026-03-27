@@ -1,19 +1,160 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
+import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/auth-store";
-import { Lock, Mail, ArrowRight } from "lucide-react";
+import { Lock, User, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
+function LiveClock() {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const raw = time.getHours();
+  const ampm = raw >= 12 ? "PM" : "AM";
+  const hh = String(raw % 12 || 12).padStart(2, "0");
+  const mm = String(time.getMinutes()).padStart(2, "0");
+
+  // Clock hand angles
+  const secAngle = time.getSeconds() * 6;
+  const minAngle = time.getMinutes() * 6 + time.getSeconds() * 0.1;
+  const hrAngle = (time.getHours() % 12) * 30 + time.getMinutes() * 0.5;
+
+  const ticks = Array.from({ length: 60 }, (_, i) => i);
+
+  return (
+    <div className="flex flex-col items-center gap-8 w-full">
+      {/* Analog Clock */}
+      <div className="relative w-56 h-56 sm:w-64 sm:h-64">
+        {/* Outer ring */}
+        <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full">
+          {/* Ambient glow */}
+          <defs>
+            <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="hsl(38,92%,50%)" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="hsl(38,92%,50%)" stopOpacity="0" />
+            </radialGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <circle cx="100" cy="100" r="95" fill="url(#glowGrad)" />
+          <circle cx="100" cy="100" r="88" fill="none" stroke="hsl(38,92%,50%)" strokeWidth="0.5" opacity="0.3" />
+          <circle cx="100" cy="100" r="78" fill="none" stroke="hsl(38,92%,50%)" strokeWidth="0.25" opacity="0.15" />
+
+          {/* Tick marks */}
+          {ticks.map((i) => {
+            const angle = (i * 6 - 90) * (Math.PI / 180);
+            const isHour = i % 5 === 0;
+            const r1 = isHour ? 72 : 76;
+            const r2 = 80;
+            const x1 = 100 + r1 * Math.cos(angle);
+            const y1 = 100 + r1 * Math.sin(angle);
+            const x2 = 100 + r2 * Math.cos(angle);
+            const y2 = 100 + r2 * Math.sin(angle);
+            return (
+              <line
+                key={i}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke="hsl(38,92%,50%)"
+                strokeWidth={isHour ? 1.5 : 0.5}
+                opacity={isHour ? 0.9 : 0.3}
+              />
+            );
+          })}
+
+          {/* Hour hand */}
+          <line
+            x1="100" y1="100"
+            x2={100 + 42 * Math.cos((hrAngle - 90) * Math.PI / 180)}
+            y2={100 + 42 * Math.sin((hrAngle - 90) * Math.PI / 180)}
+            stroke="hsl(38,92%,80%)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+
+          {/* Minute hand */}
+          <line
+            x1="100" y1="100"
+            x2={100 + 58 * Math.cos((minAngle - 90) * Math.PI / 180)}
+            y2={100 + 58 * Math.sin((minAngle - 90) * Math.PI / 180)}
+            stroke="hsl(38,92%,65%)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+
+          {/* Second hand */}
+          <line
+            x1={100 - 14 * Math.cos((secAngle - 90) * Math.PI / 180)}
+            y1={100 - 14 * Math.sin((secAngle - 90) * Math.PI / 180)}
+            x2={100 + 68 * Math.cos((secAngle - 90) * Math.PI / 180)}
+            y2={100 + 68 * Math.sin((secAngle - 90) * Math.PI / 180)}
+            stroke="hsl(38,92%,50%)"
+            strokeWidth="0.75"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+
+          {/* Center dot */}
+          <circle cx="100" cy="100" r="3" fill="hsl(38,92%,50%)" filter="url(#glow)" />
+          <circle cx="100" cy="100" r="1.5" fill="hsl(38,92%,80%)" />
+        </svg>
+      </div>
+
+      {/* Digital time display */}
+      <div className="text-center">
+        <p
+          className="tabular-nums leading-none"
+          style={{ fontFamily: "'DM Mono', monospace", color: "hsl(38,92%,60%)" }}
+        >
+          <span className="text-5xl tracking-[0.12em]">{hh}:{mm}</span>
+          <span
+            className="text-base font-semibold ml-2 align-middle"
+            style={{ color: "hsl(38,92%,50%)", letterSpacing: "0.1em" }}
+          >
+            {ampm}
+          </span>
+        </p>
+        <p className="mt-2 text-xs tracking-[0.3em] uppercase opacity-40" style={{ fontFamily: "'DM Mono', monospace", color: "hsl(38,50%,80%)" }}>
+          {time.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [focused, setFocused] = useState<"username" | "password" | null>(null);
   const [, navigate] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const login = useAuthStore((state) => state.login);
+
+  // Show toast for OAuth errors
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const error = params.get("error");
+    if (error === "oauth_failed") {
+      toast({ title: "Sign-in failed", description: "OAuth sign-in failed. Please try again.", variant: "destructive" });
+    } else if (error === "oauth_cancelled") {
+      toast({ title: "Cancelled", description: "Sign-in was cancelled." });
+    }
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -22,9 +163,7 @@ export default function Login() {
     try {
       const response = await fetch("/api/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
         credentials: "include",
       });
@@ -40,15 +179,10 @@ export default function Login() {
       }
 
       const data = await response.json();
-
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
-
+      toast({ title: "Welcome back", description: "Signed in successfully." });
       login(data.user);
       navigate("/");
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to login. Please try again.",
@@ -60,189 +194,436 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-white overflow-hidden">
-      {/* Background Gradient Elements */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
-      </div>
+    <div className="min-h-screen flex" style={{ background: "hsl(220,20%,97%)" }}>
+      {/* ── LEFT PANEL ─────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex lg:w-[52%] flex-col items-center justify-center relative overflow-hidden"
+        style={{ background: "hsl(228,25%,9%)" }}
+      >
+        {/* Subtle grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(hsl(38,92%,50%) 1px, transparent 1px), linear-gradient(90deg, hsl(38,92%,50%) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
 
-      {/* Background Texture Overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{
-        backgroundImage: "url('data:image/svg+xml,%3Csvg width=%2260%27 height=%2760%27 viewBox=%270 0 60 60%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27none%27 fill-rule=%27evenodd%27%3E%3Cg fill=%27%23000000%27 fill-opacity=%270.1%27%3E%3Cpath d=%27M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%27/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"
-      }}></div>
+        {/* Radial amber glow behind clock */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 60% at 50% 50%, hsl(38,92%,50%,0.07) 0%, transparent 70%)",
+          }}
+        />
 
-      <div className="relative min-h-screen flex">
-        {/* Left Side - Illustration & Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 items-center justify-center p-12 relative overflow-hidden">
-          {/* Animated Background Pattern */}
-          <div className="absolute inset-0">
-            <div className="absolute top-0 left-0 w-full h-full opacity-30" style={{
-              backgroundImage: `
-                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.1) 0%, transparent 50%)
-              `
-            }}></div>
-            <div className="absolute top-10 left-10 w-20 h-20 bg-green-200/30 rounded-2xl transform -rotate-45 animate-pulse"></div>
-            <div className="absolute bottom-20 right-20 w-32 h-32 bg-emerald-200/20 rounded-full animate-bounce" style={{ animationDelay: "0.5s" }}></div>
-            <div className="absolute top-1/2 left-1/4 w-24 h-24 border-2 border-green-300/30 rounded-full transform -rotate-12 animate-pulse" style={{ animationDelay: "1s" }}></div>
-            <div className="absolute top-1/4 right-1/4 w-40 h-40 rounded-full bg-gradient-to-br from-teal-300/20 to-emerald-300/10 blur-2xl"></div>
+        {/* Corner accent lines */}
+        <div className="absolute top-8 left-8 w-12 h-12 border-t border-l opacity-20" style={{ borderColor: "hsl(38,92%,50%)" }} />
+        <div className="absolute top-8 right-8 w-12 h-12 border-t border-r opacity-20" style={{ borderColor: "hsl(38,92%,50%)" }} />
+        <div className="absolute bottom-8 left-8 w-12 h-12 border-b border-l opacity-20" style={{ borderColor: "hsl(38,92%,50%)" }} />
+        <div className="absolute bottom-8 right-8 w-12 h-12 border-b border-r opacity-20" style={{ borderColor: "hsl(38,92%,50%)" }} />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center gap-12 px-16 py-12 max-w-lg w-full">
+          {/* Logo + wordmark */}
+          <div className="self-start flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: "hsl(38,92%,50%)" }}
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="hsl(228,25%,9%)" strokeWidth="2" />
+                <path d="M12 7v5l3 3" stroke="hsl(228,25%,9%)" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span
+              className="text-xl font-bold tracking-tight"
+              style={{ fontFamily: "'Syne', sans-serif", color: "hsl(38,25%,95%)" }}
+            >
+              TimeFlow
+            </span>
           </div>
 
-          {/* Illustration SVG */}
-          <div className="relative z-10 max-w-md">
-            <svg viewBox="0 0 400 400" className="w-full h-auto animate-float" xmlns="http://www.w3.org/2000/svg">
-              {/* Hourglass Illustration */}
-              <defs>
-                <linearGradient id="glassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.3" />
-                </linearGradient>
-              </defs>
+          {/* Live clock */}
+          <LiveClock />
 
-              {/* Sand particles animation concept */}
-              <circle cx="200" cy="200" r="180" fill="none" stroke="#10b981" strokeWidth="0.5" opacity="0.1" />
-              <circle cx="200" cy="200" r="140" fill="none" stroke="#10b981" strokeWidth="0.5" opacity="0.15" />
-
-              {/* Hourglass top bulb */}
-              <ellipse cx="200" cy="120" rx="50" ry="55" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" />
-              {/* Hourglass bottom bulb */}
-              <ellipse cx="200" cy="280" rx="50" ry="55" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" opacity="0.6" />
-
-              {/* Connecting tube */}
-              <rect x="190" y="160" width="20" height="80" fill="url(#glassGradient)" stroke="#10b981" strokeWidth="2" />
-
-              {/* Sand particles flowing */}
-              <g className="animate-pulse">
-                <rect x="185" y="165" width="4" height="4" fill="#10b981" opacity="0.8" />
-                <rect x="195" y="170" width="4" height="4" fill="#10b981" opacity="0.6" />
-                <rect x="190" y="180" width="4" height="4" fill="#10b981" opacity="0.7" />
-                <rect x="200" y="185" width="4" height="4" fill="#10b981" opacity="0.5" />
-                <rect x="185" y="200" width="4" height="4" fill="#10b981" opacity="0.8" />
-              </g>
-
-              {/* Frame ornament */}
-              <circle cx="160" cy="200" r="3" fill="#10b981" opacity="0.4" />
-              <circle cx="240" cy="200" r="3" fill="#10b981" opacity="0.4" />
-            </svg>
-
-            {/* Floating Cards */}
-            <div className="absolute -bottom-20 -left-10 bg-white/60 backdrop-blur-md rounded-2xl p-4 w-40 shadow-lg transform hover:scale-105 transition-transform duration-300 animate-float border border-emerald-200/50" style={{ animationDelay: "1s" }}>
-              <p className="text-emerald-900 text-xs font-semibold">Track Hours</p>
-              <p className="text-emerald-700 text-xs">Monitor your productivity</p>
-            </div>
-
-            <div className="absolute top-32 -right-5 bg-white/60 backdrop-blur-md rounded-2xl p-4 w-40 shadow-lg transform hover:scale-105 transition-transform duration-300 animate-float border border-teal-200/50" style={{ animationDelay: "0.5s" }}>
-              <p className="text-teal-900 text-xs font-semibold">Earnings</p>
-              <p className="text-teal-700 text-xs">Calculate income instantly</p>
-            </div>
+          {/* Tagline */}
+          <div className="self-start space-y-3">
+            <h2
+              className="text-3xl font-bold leading-tight"
+              style={{ fontFamily: "'Syne', sans-serif", color: "hsl(38,25%,95%)" }}
+            >
+              Every hour,<br />
+              <span style={{ color: "hsl(38,92%,50%)" }}>accounted for.</span>
+            </h2>
+            <p className="text-sm leading-relaxed opacity-40" style={{ fontFamily: "'Manrope', sans-serif", color: "hsl(38,25%,90%)" }}>
+              Track time, manage projects, and understand your earnings — all in one precise instrument.
+            </p>
           </div>
 
-          {/* Text Content */}
-          <div className="absolute bottom-10 left-0 right-0 text-center z-10">
-            <h2 className="text-emerald-900 text-2xl font-heading font-bold mb-2">Time Tracking Made Simple</h2>
-            <p className="text-emerald-700 text-sm">Track your hours, manage earnings, and boost productivity</p>
+          {/* Stats row */}
+          <div className="self-start w-full grid grid-cols-3 gap-4">
+            {[
+              { label: "Projects", value: "∞" },
+              { label: "Accuracy", value: "1s" },
+              { label: "Reports", value: "Live" },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-xl p-3 border"
+                style={{
+                  background: "hsl(228,25%,12%)",
+                  borderColor: "hsl(38,92%,50%,0.12)",
+                }}
+              >
+                <p
+                  className="text-xl font-bold"
+                  style={{ fontFamily: "'DM Mono', monospace", color: "hsl(38,92%,55%)" }}
+                >
+                  {s.value}
+                </p>
+                <p className="text-[11px] uppercase tracking-widest mt-0.5 opacity-40" style={{ color: "hsl(38,25%,85%)", fontFamily: "'Manrope', sans-serif" }}>
+                  {s.label}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Right Side - Login Form */}
-        <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 md:p-12 relative" style={{
-          backgroundImage: `
-            linear-gradient(180deg, rgba(250, 128, 114, 0.03) 0%, rgba(250, 128, 114, 0.02) 50%, transparent 100%),
-            radial-gradient(circle at 20% 50%, rgba(91, 78, 255, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(250, 128, 114, 0.05) 0%, transparent 50%)
-          `
-        }}>
-          {/* Decorative Background Elements */}
-          <div className="absolute top-10 right-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 left-10 w-60 h-60 bg-accent/5 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 right-1/4 w-32 h-32 border border-primary/10 rounded-full"></div>
+      {/* ── RIGHT PANEL ────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
+        {/* Faint top accent */}
+        <div
+          className="absolute top-0 left-0 right-0 h-px opacity-20"
+          style={{ background: "linear-gradient(90deg, transparent, hsl(38,92%,50%), transparent)" }}
+        />
 
-          <div className="w-full max-w-sm relative z-10">
-            {/* Logo Section */}
-            <div className="flex flex-col items-center gap-4 mb-10 animate-slide-in">
-              <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300 bg-white p-2">
-                <img src="/logo.svg" alt="Upwork Tracker" className="w-full h-full object-contain" />
-              </div>
-              <div className="text-center">
-                <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">Welcome</p>
-                <h1 className="text-3xl font-heading font-bold text-foreground">Upwork Tracker</h1>
-                <p className="text-sm text-muted-foreground mt-1">Manage your time, maximize your earnings</p>
-              </div>
+        {/* Floating background orbs */}
+        <motion.div
+          className="absolute w-64 h-64 rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(circle, hsl(38,92%,50%,0.07) 0%, transparent 70%)",
+            top: "10%", right: "-5%",
+          }}
+          animate={{ y: [0, -20, 0], scale: [1, 1.05, 1] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute w-48 h-48 rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(circle, hsl(38,92%,50%,0.05) 0%, transparent 70%)",
+            bottom: "15%", left: "-3%",
+          }}
+          animate={{ y: [0, 16, 0], scale: [1, 1.08, 1] }}
+          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+        />
+        <motion.div
+          className="absolute w-32 h-32 rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(circle, hsl(228,25%,50%,0.04) 0%, transparent 70%)",
+            top: "55%", right: "8%",
+          }}
+          animate={{ y: [0, -12, 0] }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+        />
+
+        <div className="w-full max-w-sm relative z-10">
+          {/* Mobile-only logo */}
+          <motion.div
+            className="flex lg:hidden items-center gap-2 justify-center mb-10"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: "hsl(38,92%,50%)" }}
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="hsl(228,25%,9%)" strokeWidth="2" />
+                <path d="M12 7v5l3 3" stroke="hsl(228,25%,9%)" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span
+              className="text-lg font-bold"
+              style={{ fontFamily: "'Syne', sans-serif", color: "hsl(228,25%,12%)" }}
+            >
+              TimeFlow
+            </span>
+          </motion.div>
+
+          {/* Header */}
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+          >
+            <motion.p
+              className="text-xs font-semibold uppercase tracking-[0.25em] mb-2"
+              style={{ color: "hsl(38,92%,50%)", fontFamily: "'DM Mono', monospace" }}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              Sign in
+            </motion.p>
+            <h1
+              className="text-3xl font-bold"
+              style={{ fontFamily: "'Syne', sans-serif", color: "hsl(228,25%,10%)" }}
+            >
+              Welcome back
+            </h1>
+            <p className="text-sm mt-1.5" style={{ color: "hsl(220,10%,48%)", fontFamily: "'Manrope', sans-serif" }}>
+              Enter your credentials to continue
+            </p>
+          </motion.div>
+
+          {/* Form card */}
+          <motion.form
+            onSubmit={handleLogin}
+            className="bg-white rounded-2xl border p-8 shadow-sm space-y-5"
+            style={{ borderColor: "hsl(220,15%,90%)" }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* Social sign-in */}
+            <motion.div
+              className="grid grid-cols-2 gap-3"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            >
+              <button
+                type="button"
+                onClick={() => { window.location.href = "/auth/google"; }}
+                className="flex items-center justify-center gap-2 h-10 rounded-xl border text-sm font-medium transition-all duration-150 hover:bg-gray-50 hover:border-gray-300 active:scale-95"
+                style={{ borderColor: "hsl(220,15%,88%)", fontFamily: "'Manrope', sans-serif", color: "hsl(228,25%,18%)" }}
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Google
+              </button>
+              <button
+                type="button"
+                onClick={() => { window.location.href = "/auth/github"; }}
+                className="flex items-center justify-center gap-2 h-10 rounded-xl border text-sm font-medium transition-all duration-150 hover:bg-gray-50 hover:border-gray-300 active:scale-95"
+                style={{ borderColor: "hsl(220,15%,88%)", fontFamily: "'Manrope', sans-serif", color: "hsl(228,25%,18%)" }}
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                  <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                </svg>
+                GitHub
+              </button>
+            </motion.div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px" style={{ background: "hsl(220,15%,90%)" }} />
+              <span className="text-xs font-medium" style={{ color: "hsl(220,10%,60%)", fontFamily: "'Manrope', sans-serif" }}>
+                or
+              </span>
+              <div className="flex-1 h-px" style={{ background: "hsl(220,15%,90%)" }} />
             </div>
 
-            {/* Form Card */}
-            <div className="bg-card rounded-2xl shadow-lg border border-border/50 backdrop-blur-sm p-8 md:p-10 animate-slide-in" style={{ animationDelay: "0.1s" }}>
-              <div className="mb-8">
-                <h2 className="text-2xl font-heading font-bold text-foreground mb-2">Sign In</h2>
-                <p className="text-sm text-muted-foreground">Enter your credentials to access your account</p>
-              </div>
+            {/* Username */}
+            <motion.div
+              className="space-y-1.5"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.28 }}
+            >
+              <label
+                htmlFor="login-username"
+                className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}
+              >
+                Username
+              </label>
+              <motion.div
+                className="relative"
+                animate={focused === "username" ? { scale: 1.01 } : { scale: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <User
+                  className={cn(
+                    "absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200",
+                    focused === "username" ? "text-amber-500" : "text-gray-400"
+                  )}
+                />
+                <Input
+                  id="login-username"
+                  type="text"
+                  placeholder="your_username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onFocus={() => setFocused("username")}
+                  onBlur={() => setFocused(null)}
+                  disabled={isLoading}
+                  required
+                  data-testid="input-username"
+                  className="pl-10 h-11 rounded-xl border text-sm transition-all duration-200 focus-visible:ring-1 focus-visible:ring-amber-400 focus-visible:border-amber-400"
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    borderColor: focused === "username" ? "hsl(38,92%,50%)" : "hsl(220,15%,88%)",
+                    background: focused === "username" ? "hsl(38,92%,99%)" : "hsl(220,15%,98%)",
+                    boxShadow: focused === "username" ? "0 0 0 3px hsl(38,92%,50%,0.12)" : "none",
+                  }}
+                />
+              </motion.div>
+            </motion.div>
 
-              <form onSubmit={handleLogin} className="space-y-6">
-                {/* Username Input */}
-                <div className="space-y-2 animate-slide-in" style={{ animationDelay: "0.2s" }}>
-                  <label htmlFor="login-username" className="text-sm font-semibold text-foreground block">
-                    Username
-                  </label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors duration-300" />
-                    <Input
-                      id="login-username"
-                      type="text"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      disabled={isLoading}
-                      className="pl-12 h-12 bg-muted/30 border-border/50 focus:bg-muted/50 focus:border-primary transition-all duration-300 rounded-lg"
-                      required
-                      data-testid="input-username"
-                    />
-                  </div>
-                </div>
+            {/* Password */}
+            <motion.div
+              className="space-y-1.5"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.36 }}
+            >
+              <label
+                htmlFor="login-password"
+                className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}
+              >
+                Password
+              </label>
+              <motion.div
+                className="relative"
+                animate={focused === "password" ? { scale: 1.01 } : { scale: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Lock
+                  className={cn(
+                    "absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200",
+                    focused === "password" ? "text-amber-500" : "text-gray-400"
+                  )}
+                />
+                <Input
+                  id="login-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocused("password")}
+                  onBlur={() => setFocused(null)}
+                  disabled={isLoading}
+                  required
+                  data-testid="input-password"
+                  className="pl-10 h-11 rounded-xl border text-sm transition-all duration-200 focus-visible:ring-1 focus-visible:ring-amber-400 focus-visible:border-amber-400"
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    borderColor: focused === "password" ? "hsl(38,92%,50%)" : "hsl(220,15%,88%)",
+                    background: focused === "password" ? "hsl(38,92%,99%)" : "hsl(220,15%,98%)",
+                    boxShadow: focused === "password" ? "0 0 0 3px hsl(38,92%,50%,0.12)" : "none",
+                  }}
+                />
+              </motion.div>
+            </motion.div>
 
-                {/* Password Input */}
-                <div className="space-y-2 animate-slide-in" style={{ animationDelay: "0.3s" }}>
-                  <label htmlFor="login-password" className="text-sm font-semibold text-foreground block">
-                    Password
-                  </label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors duration-300" />
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                      className="pl-12 h-12 bg-muted/30 border-border/50 focus:bg-muted/50 focus:border-primary transition-all duration-300 rounded-lg"
-                      required
-                      data-testid="input-password"
-                    />
-                  </div>
-                </div>
+            {/* Submit */}
+            <motion.div
+              className="pt-2"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.44 }}
+            >
+              <motion.button
+                type="submit"
+                disabled={isLoading || !username || !password}
+                data-testid="button-login"
+                className={cn(
+                  "w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2",
+                  "disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                )}
+                style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  background: "hsl(38,92%,50%)",
+                  color: "hsl(228,25%,9%)",
+                  boxShadow: username && password && !isLoading
+                    ? "0 4px 20px hsl(38,92%,50%,0.4)"
+                    : "none",
+                }}
+                whileHover={!isLoading && username && password ? { scale: 1.02, boxShadow: "0 6px 28px hsl(38,92%,50%,0.5)" } : {}}
+                whileTap={!isLoading && username && password ? { scale: 0.97 } : {}}
+                transition={{ duration: 0.15 }}
+              >
+                {/* Shimmer sweep on hover */}
+                {username && password && !isLoading && (
+                  <motion.span
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(105deg, transparent 40%, hsl(0,0%,100%,0.18) 50%, transparent 60%)",
+                      backgroundSize: "200% 100%",
+                    }}
+                    animate={{ backgroundPosition: ["200% 0", "-200% 0"] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
+                  />
+                )}
+                {isLoading ? (
+                  <>
+                    <motion.svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                    >
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </motion.svg>
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <motion.span
+                      animate={username && password ? { x: [0, 3, 0] } : { x: 0 }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.span>
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          </motion.form>
 
-                {/* Login Button */}
-                <Button
-                  type="submit"
-                  disabled={isLoading || !username || !password}
-                  className="w-full h-12 text-base font-semibold rounded-lg group animate-slide-in hover:shadow-lg transition-all duration-300 mt-8"
-                  style={{ animationDelay: "0.4s" }}
-                  data-testid="button-login"
-                >
-                  <span>{isLoading ? "Signing in..." : "Sign In"}</span>
-                  {!isLoading && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />}
-                </Button>
-              </form>
-            </div>
+          {/* Register link */}
+          <motion.p
+            className="text-center text-sm mt-5"
+            style={{ color: "hsl(220,10%,50%)", fontFamily: "'Manrope', sans-serif" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
+          >
+            Don't have an account?{" "}
+            <a
+              href="/register"
+              className="font-semibold transition-colors duration-150 hover:opacity-80"
+              style={{ color: "hsl(38,92%,45%)" }}
+            >
+              Create one
+            </a>
+          </motion.p>
 
-            {/* Footer */}
-            <div className="mt-8 text-center animate-slide-in" style={{ animationDelay: "0.5s" }}>
-              <p className="text-xs text-muted-foreground">
-                © 2025 Yash Upwork Tracker. All rights reserved.
-              </p>
-            </div>
-          </div>
+          {/* Footer */}
+          <motion.p
+            className="text-center text-[11px] mt-4 opacity-40"
+            style={{ color: "hsl(220,10%,40%)", fontFamily: "'Manrope', sans-serif" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            © 2025 TimeFlow. All rights reserved.
+          </motion.p>
         </div>
       </div>
     </div>

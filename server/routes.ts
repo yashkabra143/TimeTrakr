@@ -6,7 +6,7 @@ import {
   insertDeductionSchema,
   insertCurrencySettingsSchema,
   insertTimeEntrySchema,
-  insertWithdrawalSchema
+  insertWithdrawalSchema,
 } from "../shared/schema.js";
 import { minutesToHoursDecimal, parseTimeInput } from "../shared/time.js";
 import { scrypt, randomBytes } from "crypto";
@@ -15,33 +15,32 @@ import { z } from "zod";
 
 const scryptAsync = promisify(scrypt);
 
-
-
-// Check if we're running in a serverless environment
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+// ── Auth middleware ───────────────────────────────────────────────────────
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: "Unauthorized — please log in" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server | null> {
   console.log("[ROUTES] Starting registration...", { isServerless });
 
-  // In development, Vite handles the root route, so we skip it
-  // In production/serverless, static files are served separately
-  if (process.env.NODE_ENV === 'production' || isServerless) {
-    // Minimal setup for debugging in production
+  if (process.env.NODE_ENV === "production" || isServerless) {
     app.get("/", (_req, res) => {
-      console.log("[ROUTE] Root handler hit");
       res.json({ status: "ok", path: "/" });
     });
   }
 
-  // Simple ping endpoint
   app.get("/api/ping", (_req, res) => {
-    console.log("[PING] Hit!");
     res.json({ status: "pong", timestamp: Date.now() });
   });
 
-  // Initialize default user if none exists
-  const existingUser = await storage.getUser("admin");
-  if (!existingUser) {
+  // Ensure default admin user exists (for existing single-user deployments)
+  const existingAdmin = await storage.getUser("admin");
+  if (!existingAdmin) {
     const salt = randomBytes(16).toString("hex");
     const hashedPassword = (await scryptAsync("password123", salt, 64)) as Buffer;
     await storage.createUser({
@@ -52,7 +51,57 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     console.log("[AUTH] Created default admin user");
   }
 
-  // Authentication routes
+  // ── Register ─────────────────────────────────────────────────────────────
+  app.post("/api/register", async (req, res) => {
+    try {
+      const { username, password, email } = req.body || {};
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      if (username.length < 3) {
+        return res.status(400).json({ message: "Username must be at least 3 characters" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const existing = await storage.getUser(username);
+      if (existing) {
+        return res.status(409).json({ message: "Username already taken" });
+      }
+
+      const salt = randomBytes(16).toString("hex");
+      const hashedPassword = (await scryptAsync(password, salt, 64)) as Buffer;
+
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword.toString("hex"),
+        salt,
+        email: email || null,
+      });
+
+      const safeUser = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        dateOfBirth: user.dateOfBirth,
+        profilePicture: user.profilePicture,
+      };
+
+      // Auto-login after register
+      req.session.userId = user.id;
+      req.session.user = safeUser;
+
+      return res.status(201).json({ user: safeUser });
+    } catch (error) {
+      console.error("[REGISTER] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ── Login ─────────────────────────────────────────────────────────────────
   const loginHandler = async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body || {};
@@ -71,17 +120,20 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      // Return user without password/salt
-      return res.json({
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          dateOfBirth: user.dateOfBirth,
-          profilePicture: user.profilePicture
-        }
-      });
+      const safeUser = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        dateOfBirth: user.dateOfBirth,
+        profilePicture: user.profilePicture,
+      };
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.user = safeUser;
+
+      return res.json({ user: safeUser });
     } catch (error) {
       console.error("[LOGIN] Error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -91,33 +143,193 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.post("/api/login", loginHandler);
   app.post("/login", loginHandler);
 
-  app.post("/api/change-password", async (req, res) => {
+  // ── Me (session check) ────────────────────────────────────────────────────
+  app.get("/api/me", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.json(null);
+    }
     try {
-      const { username, currentPassword, newPassword } = req.body;
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.json(null);
+      }
+      const safeUser = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        dateOfBirth: user.dateOfBirth,
+        profilePicture: user.profilePicture,
+      };
+      // Keep session user in sync
+      req.session.user = safeUser;
+      return res.json(safeUser);
+    } catch {
+      return res.json(null);
+    }
+  });
 
-      if (!username || !currentPassword || !newPassword) {
+  // ── Logout ────────────────────────────────────────────────────────────────
+  app.post("/api/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) console.error("[LOGOUT] Error:", err);
+      res.clearCookie("connect.sid");
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // ── OAuth helpers ─────────────────────────────────────────────────────────
+  const getAppUrl = () =>
+    process.env.APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 5000}`);
+
+  // ── Google OAuth ──────────────────────────────────────────────────────────
+  app.get("/auth/google", (req, res) => {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ message: "Google OAuth not configured" });
+    }
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      redirect_uri: `${getAppUrl()}/auth/google/callback`,
+      response_type: "code",
+      scope: "openid email profile",
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  });
+
+  app.get("/auth/google/callback", async (req, res) => {
+    try {
+      const code = req.query.code as string;
+      if (!code) return res.redirect("/login?error=oauth_cancelled");
+
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          redirect_uri: `${getAppUrl()}/auth/google/callback`,
+          grant_type: "authorization_code",
+        }),
+      });
+      const tokens = await tokenRes.json() as any;
+      if (!tokens.access_token) return res.redirect("/login?error=oauth_failed");
+
+      const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      const profile = await profileRes.json() as any;
+
+      const user = await storage.findOrCreateOAuthUser({
+        provider: "google",
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        picture: profile.picture,
+      });
+
+      req.session.userId = user.id;
+      req.session.user = {
+        id: user.id, username: user.username, email: user.email,
+        fullName: user.fullName, dateOfBirth: user.dateOfBirth, profilePicture: user.profilePicture,
+      };
+      res.redirect("/");
+    } catch (err) {
+      console.error("[GOOGLE OAUTH]", err);
+      res.redirect("/login?error=oauth_failed");
+    }
+  });
+
+  // ── GitHub OAuth ──────────────────────────────────────────────────────────
+  app.get("/auth/github", (req, res) => {
+    if (!process.env.GITHUB_CLIENT_ID) {
+      return res.status(503).json({ message: "GitHub OAuth not configured" });
+    }
+    const params = new URLSearchParams({
+      client_id: process.env.GITHUB_CLIENT_ID,
+      redirect_uri: `${getAppUrl()}/auth/github/callback`,
+      scope: "read:user user:email",
+    });
+    res.redirect(`https://github.com/login/oauth/authorize?${params}`);
+  });
+
+  app.get("/auth/github/callback", async (req, res) => {
+    try {
+      const code = req.query.code as string;
+      if (!code) return res.redirect("/login?error=oauth_cancelled");
+
+      const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
+          redirect_uri: `${getAppUrl()}/auth/github/callback`,
+        }),
+      });
+      const tokens = await tokenRes.json() as any;
+      if (!tokens.access_token) return res.redirect("/login?error=oauth_failed");
+
+      const [profileRes, emailsRes] = await Promise.all([
+        fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${tokens.access_token}`, "User-Agent": "TimeFlow" },
+        }),
+        fetch("https://api.github.com/user/emails", {
+          headers: { Authorization: `Bearer ${tokens.access_token}`, "User-Agent": "TimeFlow" },
+        }),
+      ]);
+      const profile = await profileRes.json() as any;
+      const emails = await emailsRes.json() as any[];
+      const primaryEmail = Array.isArray(emails) ? (emails.find((e: any) => e.primary)?.email ?? null) : null;
+
+      const user = await storage.findOrCreateOAuthUser({
+        provider: "github",
+        id: String(profile.id),
+        email: primaryEmail ?? profile.email ?? null,
+        name: profile.name || profile.login,
+        picture: profile.avatar_url,
+      });
+
+      req.session.userId = user.id;
+      req.session.user = {
+        id: user.id, username: user.username, email: user.email,
+        fullName: user.fullName, dateOfBirth: user.dateOfBirth, profilePicture: user.profilePicture,
+      };
+      res.redirect("/");
+    } catch (err) {
+      console.error("[GITHUB OAUTH]", err);
+      res.redirect("/login?error=oauth_failed");
+    }
+  });
+
+  // ── Change password ───────────────────────────────────────────────────────
+  app.post("/api/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.session.userId!;
+
+      if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "All fields are required" });
       }
 
-      const user = await storage.getUser(username);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (!user.salt || !user.password) {
+        return res.status(400).json({ message: "OAuth accounts cannot change password here — use your Google or GitHub account settings" });
       }
 
-      // Verify current password
       const hashedCurrent = (await scryptAsync(currentPassword, user.salt, 64)) as Buffer;
       if (hashedCurrent.toString("hex") !== user.password) {
         return res.status(401).json({ message: "Incorrect current password" });
       }
 
-      // Hash new password
       const newSalt = randomBytes(16).toString("hex");
       const hashedNew = (await scryptAsync(newPassword, newSalt, 64)) as Buffer;
-
-      await storage.updateUser(user.id, {
-        password: hashedNew.toString("hex"),
-        salt: newSalt,
-      });
+      await storage.updateUser(userId, { password: hashedNew.toString("hex"), salt: newSalt });
 
       res.json({ message: "Password updated successfully" });
     } catch (error) {
@@ -126,73 +338,52 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.patch("/api/user", async (req, res) => {
+  // ── Update profile ────────────────────────────────────────────────────────
+  app.patch("/api/user", requireAuth, async (req, res) => {
     try {
-      const { currentUsername, username, email, fullName, dateOfBirth, profilePicture } = req.body;
+      const userId = req.session.userId!;
+      const { username, email, fullName, dateOfBirth, profilePicture } = req.body;
 
-      if (!currentUsername) {
-        return res.status(400).json({ message: "Current username is required" });
-      }
-
-      const user = await storage.getUser(currentUsername);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Check if new username is already taken (if username is being changed)
-      if (username && username !== currentUsername) {
-        const existingUser = await storage.getUser(username);
-        if (existingUser) {
-          return res.status(400).json({ message: "Username already taken" });
+      // Check if new username is taken
+      if (username) {
+        const current = await storage.getUserById(userId);
+        if (username !== current?.username) {
+          const taken = await storage.getUser(username);
+          if (taken) return res.status(400).json({ message: "Username already taken" });
         }
       }
 
-      const updatedUser = await storage.updateUser(user.id, {
-        username: username || currentUsername,
-        email,
-        fullName,
-        dateOfBirth,
-        profilePicture
-      });
+      const updatedUser = await storage.updateUser(userId, { username, email, fullName, dateOfBirth, profilePicture });
+      if (!updatedUser) return res.status(500).json({ message: "Failed to update user" });
 
-      if (!updatedUser) {
-        return res.status(500).json({ message: "Failed to update user" });
-      }
+      const safeUser = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        dateOfBirth: updatedUser.dateOfBirth,
+        profilePicture: updatedUser.profilePicture,
+      };
 
-      return res.json({
-        user: {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          email: updatedUser.email,
-          fullName: updatedUser.fullName,
-          dateOfBirth: updatedUser.dateOfBirth,
-          profilePicture: updatedUser.profilePicture
-        }
-      });
+      // Refresh session user
+      req.session.user = safeUser;
+
+      return res.json({ user: safeUser });
     } catch (error) {
       console.error("[UPDATE USER] Error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.get("/api/users/:username", async (req, res) => {
+  app.get("/api/users/:username", requireAuth, async (req, res) => {
     try {
-      const { username } = req.params;
-      const user = await storage.getUser(username);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const user = await storage.getUser(req.params.username);
+      if (!user) return res.status(404).json({ message: "User not found" });
       return res.json({
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          dateOfBirth: user.dateOfBirth,
-          profilePicture: user.profilePicture
-        }
+          id: user.id, username: user.username, email: user.email,
+          fullName: user.fullName, dateOfBirth: user.dateOfBirth, profilePicture: user.profilePicture,
+        },
       });
     } catch (error) {
       console.error("[GET USER] Error:", error);
@@ -200,19 +391,10 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.get("/api/me", async (req, res) => {
-    // Session check would go here
-    res.json(null);
-  });
-
-  app.post("/api/logout", async (req, res) => {
-    res.json({ message: "Logged out successfully" });
-  });
-
-  // Projects routes
-  app.get("/api/projects", async (req, res) => {
+  // ── Projects ──────────────────────────────────────────────────────────────
+  app.get("/api/projects", requireAuth, async (req, res) => {
     try {
-      const projects = await storage.getProjects();
+      const projects = await storage.getProjects(req.session.userId!);
       res.json(projects);
     } catch (error) {
       console.error("[PROJECTS GET] Error:", error);
@@ -220,44 +402,40 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.post("/api/projects", async (req, res) => {
+  app.post("/api/projects", requireAuth, async (req, res) => {
     try {
       const validated = insertProjectSchema.parse(req.body);
-      const project = await storage.createProject(validated);
+      const project = await storage.createProject(validated, req.session.userId!);
       res.status(201).json(project);
     } catch (error) {
-      console.error("[PROJECTS POST] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid project data", errors: error.errors });
       } else {
+        console.error("[PROJECTS POST] Error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     }
   });
 
-  app.patch("/api/projects/:id", async (req, res) => {
+  app.patch("/api/projects/:id", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
       const validated = insertProjectSchema.partial().parse(req.body);
-      const project = await storage.updateProject(id, validated);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
+      const project = await storage.updateProject(req.params.id, validated, req.session.userId!);
+      if (!project) return res.status(404).json({ message: "Project not found" });
       res.json(project);
     } catch (error) {
-      console.error("[PROJECTS PATCH] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid project data", errors: error.errors });
       } else {
+        console.error("[PROJECTS PATCH] Error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     }
   });
 
-  app.delete("/api/projects/:id", async (req, res) => {
+  app.delete("/api/projects/:id", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
-      await storage.deleteProject(id);
+      await storage.deleteProject(req.params.id, req.session.userId!);
       res.status(204).send();
     } catch (error) {
       console.error("[PROJECTS DELETE] Error:", error);
@@ -265,13 +443,10 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  // Deductions routes
-  app.get("/api/deductions", async (req, res) => {
+  // ── Deductions ────────────────────────────────────────────────────────────
+  app.get("/api/deductions", requireAuth, async (req, res) => {
     try {
-      const deductions = await storage.getDeductions();
-      if (!deductions) {
-        return res.status(404).json({ message: "Deductions not found" });
-      }
+      const deductions = await storage.getDeductions(req.session.userId!);
       res.json(deductions);
     } catch (error) {
       console.error("[DEDUCTIONS GET] Error:", error);
@@ -279,28 +454,25 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.patch("/api/deductions", async (req, res) => {
+  app.patch("/api/deductions", requireAuth, async (req, res) => {
     try {
       const validated = insertDeductionSchema.partial().parse(req.body);
-      const deductions = await storage.updateDeductions(validated);
+      const deductions = await storage.updateDeductions(req.session.userId!, validated);
       res.json(deductions);
     } catch (error) {
-      console.error("[DEDUCTIONS PATCH] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid deductions data", errors: error.errors });
       } else {
+        console.error("[DEDUCTIONS PATCH] Error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     }
   });
 
-  // Currency settings routes
-  app.get("/api/currency", async (req, res) => {
+  // ── Currency ──────────────────────────────────────────────────────────────
+  app.get("/api/currency", requireAuth, async (req, res) => {
     try {
-      const currency = await storage.getCurrencySettings();
-      if (!currency) {
-        return res.status(404).json({ message: "Currency settings not found" });
-      }
+      const currency = await storage.getCurrencySettings(req.session.userId!);
       res.json(currency);
     } catch (error) {
       console.error("[CURRENCY GET] Error:", error);
@@ -308,25 +480,25 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.patch("/api/currency", async (req, res) => {
+  app.patch("/api/currency", requireAuth, async (req, res) => {
     try {
       const validated = insertCurrencySettingsSchema.partial().parse(req.body);
-      const currency = await storage.updateCurrencySettings(validated);
+      const currency = await storage.updateCurrencySettings(req.session.userId!, validated);
       res.json(currency);
     } catch (error) {
-      console.error("[CURRENCY PATCH] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid currency data", errors: error.errors });
       } else {
+        console.error("[CURRENCY PATCH] Error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     }
   });
 
-  // Time entries routes
-  app.get("/api/entries", async (req, res) => {
+  // ── Time Entries ──────────────────────────────────────────────────────────
+  app.get("/api/entries", requireAuth, async (req, res) => {
     try {
-      const entries = await storage.getTimeEntries();
+      const entries = await storage.getTimeEntries(req.session.userId!);
       res.json(entries);
     } catch (error) {
       console.error("[ENTRIES GET] Error:", error);
@@ -334,67 +506,36 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.post("/api/entries", async (req, res) => {
+  app.post("/api/entries", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const baseEntry = insertTimeEntrySchema.parse(req.body);
 
       const minutesProvided = typeof baseEntry.minutes !== "undefined";
       const parsedTime = minutesProvided
-        ? {
-          minutes: baseEntry.minutes,
-          usedLegacyFractional: false,
-          hadOverflow: false,
-          source: baseEntry.minutes ?? 0,
-          format: baseEntry.inputFormat ?? "hm",
-        }
-        : parseTimeInput(
-          baseEntry.hours ?? 0,
-          { format: baseEntry.inputFormat, allowLegacyInference: true }
-        );
-
-      if (parsedTime.usedLegacyFractional) {
-        console.warn("[ENTRIES POST] Legacy fractional hours received", {
-          projectId: baseEntry.projectId,
-          rawInput: parsedTime.source,
-        });
-      }
+        ? { minutes: baseEntry.minutes, usedLegacyFractional: false, hadOverflow: false, source: baseEntry.minutes ?? 0, format: baseEntry.inputFormat ?? "hm" }
+        : parseTimeInput(baseEntry.hours ?? 0, { format: baseEntry.inputFormat, allowLegacyInference: true });
 
       const minutes = parsedTime.minutes ?? 0;
       const inputFormat = baseEntry.inputFormat || (parsedTime.usedLegacyFractional ? "fractional" : "hm");
       const hoursDecimal = minutesToHoursDecimal(minutes);
 
-      // Get project to get the rate
-      const project = await storage.getProject(baseEntry.projectId);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
+      const project = await storage.getProject(baseEntry.projectId, userId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Get deductions and currency settings
       const [deductions, currency] = await Promise.all([
-        storage.getDeductions(),
-        storage.getCurrencySettings()
+        storage.getDeductions(userId),
+        storage.getCurrencySettings(userId),
       ]);
 
-      if (!deductions || !currency) {
-        return res.status(500).json({ message: "Deductions or currency settings not configured" });
-      }
-
-      // Calculate fields based on project rate and deductions
-      // Calculate fields based on project rate and deductions
       const rate = Number(project.rate);
-
       let grossUsd = 0;
       if (project.type === "fixed") {
-        // For fixed projects, use the manual amount passed from frontend
-        // If not passed, fallback to rate (assuming rate might be the fixed price)
         grossUsd = Number(baseEntry.manualGrossAmount) || rate;
       } else {
-        // Hourly calculation
         grossUsd = hoursDecimal * rate;
       }
 
-      // Deductions - stored as percentages (e.g., 10 means 10%)
-      // Transfer/withdrawal fee excluded — applies only at withdrawal time, not per entry
       const serviceFeePercent = Number(deductions.serviceFee) || 0;
       const tdsPercent = Number(deductions.tds) || 0;
       const gstPercent = Number(deductions.gst) || 0;
@@ -402,48 +543,37 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       const deductionService = grossUsd * (serviceFeePercent / 100);
       const deductionTds = grossUsd * (tdsPercent / 100);
       const deductionGst = deductionService * (gstPercent / 100);
-      const deductionTransfer = 0; // kept in schema for withdrawal history only
+      const deductionTransfer = 0;
       const deductionTotal = deductionService + deductionTds + deductionGst;
-
-      // Net calculations (transfer fee excluded from per-entry calculation)
       const netUsd = Math.max(0, grossUsd - deductionTotal);
-
       const exchangeRate = Number(currency.usdToInr) || 0;
       const netInr = netUsd * exchangeRate;
 
-      const { hours: _legacyHours, manualGrossAmount: _manualGross, ...cleanEntry } = baseEntry;
-      const entry = {
+      const { hours: _h, manualGrossAmount: _m, ...cleanEntry } = baseEntry;
+      const created = await storage.createTimeEntry({
         ...cleanEntry,
+        userId,
         minutes,
         inputFormat,
         rawInput: baseEntry.rawInput ?? String(parsedTime.source ?? ""),
-        grossUsd,
-        deductionService,
-        deductionGst,
-        deductionTds,
-        deductionTransfer,
-        deductionTotal,
-        netUsd,
-        netInr,
-        exchangeRate,
-      };
+        grossUsd, deductionService, deductionGst, deductionTds,
+        deductionTransfer, deductionTotal, netUsd, netInr, exchangeRate,
+      });
 
-      const created = await storage.createTimeEntry(entry);
       res.status(201).json(created);
     } catch (error) {
-      console.error("[ENTRIES POST] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid entry data", errors: error.errors });
       } else {
+        console.error("[ENTRIES POST] Error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     }
   });
 
-  app.delete("/api/entries/:id", async (req, res) => {
+  app.delete("/api/entries/:id", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
-      await storage.deleteTimeEntry(id);
+      await storage.deleteTimeEntry(req.params.id, req.session.userId!);
       res.status(204).send();
     } catch (error) {
       console.error("[ENTRIES DELETE] Error:", error);
@@ -451,76 +581,14 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  // Withdrawal routes
-  app.get("/api/withdrawals", async (req, res) => {
+  // ── CSV Import: Time Entries ───────────────────────────────────────────────
+  app.post("/api/entries/import", requireAuth, async (req, res) => {
     try {
-      const withdrawals = await storage.getWithdrawals();
-      res.json(withdrawals);
-    } catch (error) {
-      console.error("[WITHDRAWALS GET] Error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/withdrawals", async (req, res) => {
-    try {
-      const validated = insertWithdrawalSchema.parse(req.body);
-      const withdrawal = await storage.createWithdrawal(validated);
-      res.status(201).json(withdrawal);
-    } catch (error) {
-      console.error("[WITHDRAWALS POST] Error:", error);
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid withdrawal data", errors: error.errors });
-      } else {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    }
-  });
-
-  app.patch("/api/withdrawals/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { paymentStatus } = req.body;
-
-      if (!paymentStatus) {
-        return res.status(400).json({ message: "Payment status is required" });
-      }
-
-      const withdrawal = await storage.updateWithdrawalStatus(id, paymentStatus);
-      if (!withdrawal) {
-        return res.status(404).json({ message: "Withdrawal not found" });
-      }
-      res.json(withdrawal);
-    } catch (error) {
-      console.error("[WITHDRAWALS PATCH] Error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.delete("/api/withdrawals/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteWithdrawal(id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("[WITHDRAWALS DELETE] Error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // ── CSV Import: Time Entries ─────────────────────────────────────────────
-  // Supports two formats:
-  //   1. Simple:  date, project, hours, description
-  //   2. Upwork:  Date, Transaction ID, Transaction type, Transaction summary,
-  //               Transaction summary details, Description 1..3, Freelancer,
-  //               Client team, Account name, Amount $, ...
-  app.post("/api/entries/import", async (req, res) => {
-    try {
+      const userId = req.session.userId!;
       const { csv } = req.body as { csv: string };
       if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
 
-      // ── Parse CSV (handles quoted fields with commas) ──────────────────
       function parseCSVLine(line: string): string[] {
         const result: string[] = [];
         let cur = "";
@@ -537,12 +605,10 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       function parseDate(str: string): Date | null {
         if (!str) return null;
-        // M/D/YYYY or MM/DD/YYYY
         if (str.includes("/")) {
           const d = new Date(str);
           return isNaN(d.getTime()) ? null : d;
         }
-        // YYYY-MM-DD
         const d = new Date(str + "T00:00:00");
         return isNaN(d.getTime()) ? null : d;
       }
@@ -553,23 +619,19 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       const rawHeaders = parseCSVLine(lines[0]);
       const headers = rawHeaders.map(h => h.toLowerCase().replace(/"/g, "").trim());
-
-      // ── Detect Upwork format ───────────────────────────────────────────
       const isUpwork = headers.includes("transaction id") || headers.includes("transaction type") || headers.includes("amount $");
 
       const [projects, deductions, currency] = await Promise.all([
-        storage.getProjects(), storage.getDeductions(), storage.getCurrencySettings(),
+        storage.getProjects(userId),
+        storage.getDeductions(userId),
+        storage.getCurrencySettings(userId),
       ]);
-      if (!deductions || !currency)
-        return res.status(500).json({ message: "Deductions/currency settings not configured" });
 
       const exchangeRate = Number(currency.usdToInr) || 0;
       const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
-      // Track skipped rows (fees, withdrawals) — not failures
       let skipped = 0;
 
-      // ── Upwork earnings transaction types to import ────────────────────
       const EARNINGS_TYPES = [
         "hourly", "fixed-price", "fixed price", "bonus", "manual time",
         "client funded milestone", "milestone payment", "hourly payment",
@@ -583,108 +645,72 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         const row: Record<string, string> = {};
         headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").replace(/^"|"$/g, "").trim(); });
 
-        // ────────────────────────────────────────────────────────────────
         if (isUpwork) {
-          // Skip non-earnings rows (service fees, withdrawals, refunds)
           const txType = (row["transaction type"] || "").toLowerCase();
           const amtRaw = row["amount $"] || row["amount"] || "";
           const amtVal = parseFloat(amtRaw.replace(/[^0-9.\-]/g, ""));
 
           if (isNaN(amtVal) || amtVal <= 0) { skipped++; continue; }
-
           const isEarning = EARNINGS_TYPES.some(t => txType.includes(t)) || amtVal > 0;
           if (!isEarning) { skipped++; continue; }
 
-          // Date
           const dateVal = parseDate(row["date"]);
           if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
-          // Build description from available fields
-          const descParts = [
-            row["transaction summary"],
-            row["transaction summary details"],
-            row["description 1"],
-            row["description 2"],
-            row["description 3"],
-          ].filter(Boolean);
+          const descParts = [row["transaction summary"], row["transaction summary details"], row["description 1"], row["description 2"], row["description 3"]].filter(Boolean);
           const description = descParts.join(" · ").slice(0, 500) || null;
 
-          // Match project: try Transaction summary → Client team → Account name → first project
-          const tryNames = [
-            row["transaction summary"],
-            row["client team"],
-            row["account name"],
-            row["freelancer"],
-          ].filter(Boolean);
-
+          const tryNames = [row["transaction summary"], row["client team"], row["account name"], row["freelancer"]].filter(Boolean);
           let project = tryNames.reduce<typeof projects[0] | undefined>((found, name) =>
-            found ?? projects.find(p => p.name.toLowerCase() === name.toLowerCase())
-          , undefined);
+            found ?? projects.find(p => p.name.toLowerCase() === name.toLowerCase()), undefined);
+          if (!project) project = projects[0];
+          if (!project) { failed.push({ row: i, reason: "No projects found — create one first" }); continue; }
 
-          if (!project) project = projects[0]; // fallback to first project
-          if (!project) { failed.push({ row: i, reason: "No projects found in app — create one first" }); continue; }
-
-          // Use actual Upwork amount as gross (already reflects what Upwork paid out)
           const grossUsd = amtVal;
           const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
           const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
-          const gst  = svc * ((Number(deductions.gst) || 0) / 100);
+          const gst = svc * ((Number(deductions.gst) || 0) / 100);
           const total = svc + tds + gst;
           const netUsd = Math.max(0, grossUsd - total);
 
           try {
             const entry = await storage.createTimeEntry({
-              projectId: project.id,
-              minutes: 0,
-              inputFormat: "fractional",
-              rawInput: String(amtVal),
-              date: dateVal,
-              description,
-              grossUsd,
-              deductionService: svc,
-              deductionGst: gst,
-              deductionTds: tds,
-              deductionTransfer: 0,
-              deductionTotal: total,
-              netUsd,
-              netInr: netUsd * exchangeRate,
-              exchangeRate,
+              projectId: project.id, userId, minutes: 0, inputFormat: "fractional",
+              rawInput: String(amtVal), date: dateVal, description, grossUsd,
+              deductionService: svc, deductionGst: gst, deductionTds: tds,
+              deductionTransfer: 0, deductionTotal: total, netUsd,
+              netInr: netUsd * exchangeRate, exchangeRate,
             });
             imported.push(entry.id);
           } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
 
         } else {
-          // ── Simple / Upwork Hours format ───────────────────────────────
-          // Accepts: date, project, hours, description
-          //      OR: date, contract, hours          (Upwork hours report)
           const dateVal = parseDate(row["date"]);
           if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
           const hoursVal = parseFloat(row["hours"]);
           if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row["hours"]}"` }); continue; }
 
-          // Accept "contract" (Upwork) or "project" (simple) as project name
           const projectName = row["contract"] || row["project"] || "";
           const project = projects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
-          if (!project) { failed.push({ row: i, reason: `Project not found: "${projectName}" — make sure it exists in Settings` }); continue; }
+          if (!project) { failed.push({ row: i, reason: `Project not found: "${projectName}"` }); continue; }
 
           const minutes = Math.round(hoursVal * 60);
           const rate = Number(project.rate);
           const grossUsd = hoursVal * rate;
           const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
           const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
-          const gst  = svc * ((Number(deductions.gst) || 0) / 100);
+          const gst = svc * ((Number(deductions.gst) || 0) / 100);
           const total = svc + tds + gst;
           const netUsd = Math.max(0, grossUsd - total);
 
           try {
             const entry = await storage.createTimeEntry({
-              projectId: project.id, minutes, inputFormat: "fractional",
-              rawInput: String(hoursVal), date: dateVal,
-              description: row["description"] || null,
+              projectId: project.id, userId, minutes, inputFormat: "fractional",
+              rawInput: String(hoursVal), date: dateVal, description: row["description"] || null,
               grossUsd, deductionService: svc, deductionGst: gst, deductionTds: tds,
-              deductionTransfer: 0, deductionTotal: total,
-              netUsd, netInr: netUsd * exchangeRate, exchangeRate,
+              deductionTransfer: 0, deductionTotal: total, netUsd,
+              netInr: netUsd * exchangeRate, exchangeRate,
             });
             imported.push(entry.id);
           } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
@@ -698,22 +724,70 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  // ── CSV Import: Withdrawals ───────────────────────────────────────────────
-  // Expected CSV columns: date, amount, notes (optional), status (optional: pending/received)
-  app.post("/api/withdrawals/import", async (req, res) => {
+  // ── Withdrawals ───────────────────────────────────────────────────────────
+  app.get("/api/withdrawals", requireAuth, async (req, res) => {
     try {
-      const { csv } = req.body as { csv: string };
-      if (!csv || typeof csv !== "string") {
-        return res.status(400).json({ message: "No CSV content provided" });
+      const withdrawals = await storage.getWithdrawals(req.session.userId!);
+      res.json(withdrawals);
+    } catch (error) {
+      console.error("[WITHDRAWALS GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/withdrawals", requireAuth, async (req, res) => {
+    try {
+      const validated = insertWithdrawalSchema.parse(req.body);
+      const withdrawal = await storage.createWithdrawal(validated, req.session.userId!);
+      res.status(201).json(withdrawal);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid withdrawal data", errors: error.errors });
+      } else {
+        console.error("[WITHDRAWALS POST] Error:", error);
+        res.status(500).json({ message: "Internal server error" });
       }
+    }
+  });
+
+  app.patch("/api/withdrawals/:id", requireAuth, async (req, res) => {
+    try {
+      const { paymentStatus } = req.body;
+      if (!paymentStatus) return res.status(400).json({ message: "Payment status is required" });
+
+      const withdrawal = await storage.updateWithdrawalStatus(req.params.id, paymentStatus, req.session.userId!);
+      if (!withdrawal) return res.status(404).json({ message: "Withdrawal not found" });
+      res.json(withdrawal);
+    } catch (error) {
+      console.error("[WITHDRAWALS PATCH] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/withdrawals/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteWithdrawal(req.params.id, req.session.userId!);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[WITHDRAWALS DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ── CSV Import: Withdrawals ───────────────────────────────────────────────
+  app.post("/api/withdrawals/import", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { csv } = req.body as { csv: string };
+      if (!csv || typeof csv !== "string")
+        return res.status(400).json({ message: "No CSV content provided" });
 
       const lines = csv.trim().split(/\r?\n/);
       if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header and at least one row" });
 
       const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
-      if (!headers.includes("date") || !headers.includes("amount")) {
+      if (!headers.includes("date") || !headers.includes("amount"))
         return res.status(400).json({ message: "Missing required columns: date, amount" });
-      }
 
       const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
@@ -738,15 +812,11 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
         try {
           const w = await storage.createWithdrawal({
-            netEarnings: amount,
-            transactionFee,
-            withdrawalAmount,
-            withdrawalDate: dateVal,
-            paymentStatus: status,
-            notes: row.notes || null,
-          });
+            netEarnings: amount, transactionFee, withdrawalAmount,
+            withdrawalDate: dateVal, paymentStatus: status, notes: row.notes || null,
+          }, userId);
           imported.push(w.id);
-        } catch (err) {
+        } catch {
           failed.push({ row: i, reason: "Failed to save withdrawal" });
         }
       }
@@ -758,37 +828,19 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  // Catch-all - MUST be last, after all other routes
-  // In development, Vite handles non-API routes, so we only add catch-all in production/serverless
-  if (process.env.NODE_ENV === 'production' || isServerless) {
+  // ── Catch-all (production) ────────────────────────────────────────────────
+  if (process.env.NODE_ENV === "production" || isServerless) {
     app.all("*", (req, res) => {
-      console.log(`[404] Unhandled path: ${req.method} ${req.path}`, {
-        method: req.method,
-        path: req.path,
-        url: req.url,
-        originalUrl: req.originalUrl
-      });
       if (!res.headersSent) {
-        res.status(404).json({ error: "Not Found", path: req.path, method: req.method });
+        res.status(404).json({ error: "Not Found", path: req.path });
       }
     });
   }
 
-  // Only create HTTP server for traditional deployments (not serverless)
-  // In serverless environments (Vercel, AWS Lambda), the platform handles the server
   if (isServerless) {
-    console.log("[ROUTES] Serverless environment detected - skipping HTTP server creation");
+    console.log("[ROUTES] Serverless mode — skipping HTTP server creation");
     return null;
   }
 
-  const httpServer = createServer(app);
-  return httpServer;
-
-  /*
-  // Health check endpoint
-  app.get("/api/health", async (_req, res) => {
-    // ...
-  });
-  // ... rest of the file
-  */
+  return createServer(app);
 }

@@ -3,8 +3,24 @@ import { pgTable, text, varchar, real, timestamp, integer } from "drizzle-orm/pg
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users defined first — all other tables reference it
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email"),
+  fullName: text("full_name"),
+  dateOfBirth: text("date_of_birth"),
+  profilePicture: text("profile_picture"),
+  password: text("password"),         // nullable — OAuth users have no password
+  salt: text("salt"),                 // nullable — OAuth users have no salt
+  googleId: text("google_id").unique(),
+  githubId: text("github_id").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),           // nullable for backward compat; migration fills it
   name: text("name").notNull(),
   rate: real("rate").notNull(),
   color: text("color").notNull(),
@@ -14,6 +30,7 @@ export const projects = pgTable("projects", {
 
 export const deductions = pgTable("deductions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),           // nullable for backward compat
   serviceFee: real("service_fee").notNull().default(10),
   tds: real("tds").notNull().default(0.1),
   gst: real("gst").notNull().default(18),
@@ -23,12 +40,14 @@ export const deductions = pgTable("deductions", {
 
 export const currencySettings = pgTable("currency_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),           // nullable for backward compat
   usdToInr: real("usd_to_inr").notNull().default(84.0),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const timeEntries = pgTable("time_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),           // nullable for backward compat
   projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   minutes: integer("minutes").notNull(),
   inputFormat: text("input_format").notNull().default("hm"),
@@ -50,47 +69,41 @@ export const timeEntries = pgTable("time_entries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email"),
-  fullName: text("full_name"),
-  dateOfBirth: text("date_of_birth"),
-  profilePicture: text("profile_picture"),
-  password: text("password").notNull(), // Hashed password
-  salt: text("salt").notNull(), // Salt for hashing
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 export const withdrawals = pgTable("Withdrawl", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),           // nullable for backward compat
   netEarnings: real("net_earnings").notNull(),
   transactionFee: real("transaction_fee").notNull().default(0.99),
   withdrawalAmount: real("withdrawal_amount").notNull(),
   withdrawalDate: timestamp("withdrawal_date").notNull(),
-  paymentStatus: text("payment_status").notNull().default("pending"), // "pending" or "received"
+  paymentStatus: text("payment_status").notNull().default("pending"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Insert schemas
+// ── Insert schemas (userId always omitted — set server-side from session) ──
+
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
+  userId: true,
   createdAt: true,
 });
 
 export const insertDeductionSchema = createInsertSchema(deductions).omit({
   id: true,
+  userId: true,
   updatedAt: true,
 });
 
 export const insertCurrencySettingsSchema = createInsertSchema(currencySettings).omit({
   id: true,
+  userId: true,
   updatedAt: true,
 });
 
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   id: true,
+  userId: true,
   inputFormat: true,
   rawInput: true,
   grossUsd: true,
@@ -105,12 +118,10 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   createdAt: true,
 }).extend({
   minutes: z.number().int().min(0).optional(),
-  hours: z.number().min(0).optional(), // Legacy fractional input
+  hours: z.number().min(0).optional(),
   inputFormat: z.enum(["hm", "fractional"]).optional(),
   rawInput: z.union([z.string(), z.number()]).optional(),
-  date: z.coerce.date({
-    required_error: "Date is required",
-  }),
+  date: z.coerce.date({ required_error: "Date is required" }),
   manualGrossAmount: z.number().optional(),
 }).superRefine((data, ctx) => {
   if (typeof data.minutes === "undefined" && typeof data.hours === "undefined") {
@@ -129,14 +140,14 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   id: true,
+  userId: true,
   createdAt: true,
 }).extend({
-  withdrawalDate: z.coerce.date({
-    required_error: "Withdrawal date is required",
-  }),
+  withdrawalDate: z.coerce.date({ required_error: "Withdrawal date is required" }),
 });
 
-// Select schemas (TypeScript types)
+// ── TypeScript types ──────────────────────────────────────────────────────
+
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 

@@ -1,7 +1,25 @@
 import { type Server } from "node:http";
 
 import express, { type Express, type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { registerRoutes } from "./routes.js";
+
+// ── Session type augmentation ─────────────────────────────────────────────
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+    user: {
+      id: string;
+      username: string;
+      email?: string | null;
+      fullName?: string | null;
+      dateOfBirth?: string | null;
+      profilePicture?: string | null;
+    };
+  }
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -10,37 +28,59 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
 export const app = express();
 
-// Trust proxy - important for Vercel deployment
+// Trust proxy — important for Vercel / secure cookies behind reverse proxy
 app.set("trust proxy", 1);
 
-declare module 'http' {
+declare module "http" {
   interface IncomingMessage {
-    rawBody: unknown
+    rawBody: unknown;
   }
 }
+
 app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
+  verify: (req, _res, buf) => { req.rawBody = buf; },
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// Debug logging middleware - log ALL request details
-app.use((req, res, next) => {
-  console.log(`[DEBUG] Request: ${req.method} ${req.path}`, {
-    method: req.method,
-    path: req.path,
-    url: req.url,
-    originalUrl: req.originalUrl,
-    baseUrl: req.baseUrl,
-    body: req.body ? 'has body' : 'no body',
-    query: Object.keys(req.query || {}).length > 0 ? req.query : 'no query'
+// ── Session middleware ─────────────────────────────────────────────────────
+const PgStore = connectPgSimple(session);
+
+// Use pg Pool (node-postgres) for session storage — works with Neon's connection string
+const pgPool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  max: 3,
+});
+
+app.use(
+  session({
+    store: new PgStore({
+      pool: pgPool,
+      createTableIfMissing: true, // auto-creates "session" table in Neon
+      tableName: "session",
+    }),
+    secret: process.env.SESSION_SECRET || "timeflow-dev-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: "lax",
+    },
+  })
+);
+
+// ── Debug logging middleware ──────────────────────────────────────────────
+app.use((req, _res, next) => {
+  console.log(`[DEBUG] ${req.method} ${req.path}`, {
+    sessionUserId: req.session?.userId ?? "none",
+    body: req.body ? "has body" : "no body",
   });
   next();
 });
@@ -53,29 +93,17 @@ export default async function runApp(
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    // Don't throw after sending response - just log the error
     console.error("[APP ERROR]", err);
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
   });
 
-  // importantly run the final setup after setting up all the other routes so
-  // the catch-all route doesn't interfere with the other routes
   await setup(app, server);
 
-  // Only start listening if we have a server (not in serverless mode)
   if (server) {
-    // ALWAYS serve the app on the port specified in the environment variable PORT
-    // Other ports are firewalled. Default to 5000 if not specified.
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen({
-      port,
-      host: "127.0.0.1",
-    }, () => {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    server.listen({ port, host: "127.0.0.1" }, () => {
       log(`serving on port ${port}`);
     });
   } else {
