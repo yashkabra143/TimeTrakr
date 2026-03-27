@@ -14,6 +14,10 @@
             "dest": "/api/[...]"
         },
         {
+            "src": "^/auth/(.*)",
+            "dest": "/api/[...]"
+        },
+        {
             "src": "^/attached_assets/(.*)$",
             "dest": "/attached_assets/$1"
         },
