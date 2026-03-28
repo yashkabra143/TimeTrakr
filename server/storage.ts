@@ -19,7 +19,7 @@ import {
   type InsertWithdrawal,
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 
 export interface IStorage {
@@ -303,7 +303,29 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // 3. Create new user — derive a unique username
+    // 3. Link to seed account (password-registered user with no email/OAuth yet)
+    const [seedUser] = await db
+      .select()
+      .from(users)
+      .where(and(isNull(users.email), isNull(users.googleId), isNull(users.githubId)))
+      .limit(1);
+
+    if (seedUser) {
+      const linkData = provider === "google" ? { googleId: id } : { githubId: id };
+      const [linked] = await db
+        .update(users)
+        .set({
+          ...linkData,
+          email: email ?? null,
+          fullName: name ?? seedUser.fullName,
+          profilePicture: picture ?? seedUser.profilePicture,
+        })
+        .where(eq(users.id, seedUser.id))
+        .returning();
+      return linked;
+    }
+
+    // 4. Create new user — derive a unique username
     let base = name
       ? name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "").slice(0, 20)
       : (email?.split("@")[0] ?? provider);
