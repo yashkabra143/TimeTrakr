@@ -78,6 +78,8 @@ pnpm-debug.log*
 .replit
 .claude/
 .mcp.json
+my-video/
+attached_assets/
 
 # ============================
 # TypeScript
