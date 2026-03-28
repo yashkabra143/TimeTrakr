@@ -3,6 +3,7 @@ import {
   deductions,
   currencySettings,
   timeEntries,
+  tdsEntries,
   users,
   withdrawals,
   type Project,
@@ -13,13 +14,15 @@ import {
   type InsertCurrencySetting,
   type TimeEntry,
   type InsertTimeEntry,
+  type TdsEntry,
+  type InsertTdsEntry,
   type User,
   type InsertUser,
   type Withdrawal,
   type InsertWithdrawal,
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 
 export interface IStorage {
@@ -55,9 +58,15 @@ export interface IStorage {
   }): Promise<TimeEntry>;
   deleteTimeEntry(id: string, userId: string): Promise<void>;
 
+  // TDS Entries (Indian client TDS certificates)
+  getTdsEntries(userId: string): Promise<TdsEntry[]>;
+  createTdsEntry(entry: InsertTdsEntry, userId: string): Promise<TdsEntry>;
+  deleteTdsEntry(id: string, userId: string): Promise<void>;
+
   // Users
   getUser(username: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
+  getUsersWithRemindersEnabled(): Promise<User[]>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: Partial<InsertUser> & { username: string }): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
@@ -232,7 +241,17 @@ export class DatabaseStorage implements IStorage {
     netInr: number;
     exchangeRate: number;
   }): Promise<TimeEntry> {
-    const [newEntry] = await db.insert(timeEntries).values(entry).returning();
+    // Destructure out Zod-only fields that aren't real DB columns,
+    // and fields whose Zod types differ from the DB column types
+    const { hours, manualGrossAmount, minutes, rawInput, ...rest } = entry;
+    const [newEntry] = await db
+      .insert(timeEntries)
+      .values({
+        ...rest,
+        minutes: minutes ?? Math.round((hours ?? 0) * 60),
+        rawInput: rawInput != null ? String(rawInput) : null,
+      })
+      .returning();
     return newEntry;
   }
 
@@ -250,6 +269,13 @@ export class DatabaseStorage implements IStorage {
   async getUserById(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user ?? undefined;
+  }
+
+  async getUsersWithRemindersEnabled(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(and(isNotNull(users.email), eq(users.reminderEnabled, true)));
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -388,6 +414,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWithdrawal(id: string, userId: string): Promise<void> {
     await db.delete(withdrawals).where(and(eq(withdrawals.id, id), eq(withdrawals.userId, userId)));
+  }
+
+  // ── TDS Entries ───────────────────────────────────────────────────────────
+  async getTdsEntries(userId: string): Promise<TdsEntry[]> {
+    return await db.select().from(tdsEntries).where(eq(tdsEntries.userId, userId)).orderBy(desc(tdsEntries.date));
+  }
+
+  async createTdsEntry(entry: InsertTdsEntry, userId: string): Promise<TdsEntry> {
+    const [created] = await db.insert(tdsEntries).values({ ...entry, userId }).returning();
+    return created;
+  }
+
+  async deleteTdsEntry(id: string, userId: string): Promise<void> {
+    await db.delete(tdsEntries).where(and(eq(tdsEntries.id, id), eq(tdsEntries.userId, userId)));
   }
 }
 

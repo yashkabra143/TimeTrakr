@@ -128,6 +128,42 @@ export async function deleteWithdrawal(id: string): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete withdrawal");
 }
 
+// Current user
+export async function getCurrentUser(): Promise<any> {
+  const response = await fetch(`${API_URL}/me`);
+  if (!response.ok) throw new Error("Failed to fetch user");
+  return response.json();
+}
+
+export async function updateUser(data: {
+  username?: string;
+  email?: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  profilePicture?: string;
+  reminderEnabled?: boolean;
+}): Promise<any> {
+  const response = await fetch(`${API_URL}/user`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || "Failed to update user");
+  }
+  return response.json();
+}
+
+export async function sendTestReminder(): Promise<{ sent: string[] }> {
+  const response = await fetch(`${API_URL}/reminders/test`, { method: "POST" });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || "Failed to send test");
+  }
+  return response.json();
+}
+
 // CSV Imports
 export type ImportResult = { imported: number; failed: { row: number; reason: string }[]; total: number };
 

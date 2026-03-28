@@ -14,6 +14,7 @@ import {
   Lock,
   History,
   Timer,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { label: "Quick Entry", href: "/quick-entry", icon: Zap },
   { label: "Weekly", href: "/weekly", icon: Calendar },
   { label: "History", href: "/history", icon: History },
+  { label: "Tax", href: "/tax", icon: FileText },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

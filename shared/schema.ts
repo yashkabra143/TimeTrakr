@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, real, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   salt: text("salt"),                 // nullable — OAuth users have no salt
   googleId: text("google_id").unique(),
   githubId: text("github_id").unique(),
+  reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -35,6 +36,8 @@ export const deductions = pgTable("deductions", {
   tds: real("tds").notNull().default(0.1),
   gst: real("gst").notNull().default(18),
   transferFee: real("transfer_fee").notNull().default(0.99),
+  isGstRegistered: boolean("is_gst_registered").notNull().default(false),
+  taxSlabRate: real("tax_slab_rate").notNull().default(30),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -78,6 +81,19 @@ export const withdrawals = pgTable("Withdrawl", {
   withdrawalDate: timestamp("withdrawal_date").notNull(),
   paymentStatus: text("payment_status").notNull().default("pending"),
   notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const tdsEntries = pgTable("tds_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  deductorName: text("deductor_name").notNull(),
+  panNumber: text("pan_number"),
+  amount: real("amount").notNull(),         // TDS amount in INR
+  grossAmount: real("gross_amount").notNull(), // Gross invoice in INR
+  certificateNumber: text("certificate_number"),
+  quarter: text("quarter").notNull(),       // e.g. "Q1 FY2025-26"
+  date: timestamp("date").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -165,3 +181,14 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+
+export const insertTdsEntrySchema = createInsertSchema(tdsEntries).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+}).extend({
+  date: z.coerce.date(),
+});
+
+export type TdsEntry = typeof tdsEntries.$inferSelect;
+export type InsertTdsEntry = z.infer<typeof insertTdsEntrySchema>;

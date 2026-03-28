@@ -9,6 +9,7 @@ import QuickEntry from "@/pages/quick-entry";
 import Weekly from "@/pages/weekly";
 import History from "@/pages/history";
 import Settings from "@/pages/settings";
+import TaxPage from "@/pages/tax";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -81,6 +82,9 @@ function App() {
         </Route>
         <Route path="/profile">
           <ProtectedRoute component={Profile} />
+        </Route>
+        <Route path="/tax">
+          <ProtectedRoute component={TaxPage} />
         </Route>
 
         {/* 404 route */}

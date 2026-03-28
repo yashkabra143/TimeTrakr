@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject } from "@/lib/hooks";
+import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject, useCurrentUser, useUpdateUser, useSendTestReminder } from "@/lib/hooks";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PROJECT_COLORS = [
@@ -41,6 +41,8 @@ const deductionSchema = z.object({
   tds: z.coerce.number().min(0).max(100),
   gst: z.coerce.number().min(0).max(100),
   transferFee: z.coerce.number().min(0),
+  isGstRegistered: z.boolean().default(false),
+  taxSlabRate: z.coerce.number().min(0).max(100),
 });
 
 const currencySchema = z.object({
@@ -71,6 +73,108 @@ function SectionCard({ title, description, children }: { title: string; descript
       </div>
       <div className="p-6">{children}</div>
     </div>
+  );
+}
+
+function TaxRemindersCard() {
+  const { data: me } = useCurrentUser();
+  const updateUser = useUpdateUser();
+  const sendTest = useSendTestReminder();
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (me?.user) setEnabled(me.user.reminderEnabled ?? false);
+  }, [me]);
+
+  async function handleSave() {
+    try {
+      await updateUser.mutateAsync({ reminderEnabled: enabled });
+      toast({ title: "Reminder preferences saved" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save preferences.", variant: "destructive" });
+    }
+  }
+
+  async function handleTest() {
+    try {
+      await sendTest.mutateAsync();
+      toast({ title: "Test email sent!", description: `Check ${me?.user?.email}` });
+    } catch (e: any) {
+      toast({ title: "Test failed", description: e.message, variant: "destructive" });
+    }
+  }
+
+  const hasEmail = !!me?.user?.email;
+
+  return (
+    <SectionCard
+      title="Tax Reminders"
+      description="Get email alerts before advance tax due dates (Jun 15, Sep 15, Dec 15, Mar 15)."
+    >
+      <div className="space-y-5">
+        {/* Email destination */}
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-background">
+          <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Reminder email</p>
+            <p className="text-xs text-muted-foreground truncate" style={{ fontFamily: "'DM Mono', monospace" }}>
+              {hasEmail ? me.user.email : "No email on account — add one in Profile first"}
+            </p>
+          </div>
+        </div>
+
+        {/* Enable toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Enable email reminders</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Sent 7 days before, 3 days before, and on the due date.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            disabled={!hasEmail}
+            onClick={() => setEnabled(!enabled)}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+              enabled ? "bg-primary" : "bg-muted"
+            )}
+          >
+            <span className={cn(
+              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200",
+              enabled ? "translate-x-5" : "translate-x-0"
+            )} />
+          </button>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-1 border-t border-border/40">
+          <motion.button
+            type="button"
+            onClick={handleTest}
+            disabled={sendTest.isPending || !hasEmail || !enabled}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-semibold border border-border hover:bg-muted transition-colors disabled:opacity-50"
+            style={{ fontFamily: "'Manrope', sans-serif" }}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            {sendTest.isPending ? "Sending..." : "Send Test Email"}
+          </motion.button>
+          <motion.button
+            type="button"
+            onClick={handleSave}
+            disabled={updateUser.isPending || !hasEmail}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-semibold ml-auto disabled:opacity-50"
+            style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}
+          >
+            <Save className="w-3.5 h-3.5" />
+            {updateUser.isPending ? "Saving..." : "Save Preferences"}
+          </motion.button>
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -144,14 +248,18 @@ export default function Settings() {
   async function fetchLiveExchangeRate() {
     setIsFetchingRate(true);
     try {
-      const res = await fetch("https://api.frankfurter.dev/latest?from=USD&to=INR");
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      await updateCurrency.mutateAsync({ usdToInr: data.rates.INR });
-      currencyForm.setValue("usdToInr", data.rates.INR);
-      toast({ title: "Rate Updated", description: `Live rate: ₹${data.rates.INR.toFixed(2)}` });
-    } catch {
-      toast({ title: "Error", description: "Failed to fetch live rate.", variant: "destructive" });
+      const res = await fetch("/api/exchange-rate/live");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as any).message || "Failed to fetch");
+      const { rate } = data as { rate: unknown };
+      if (typeof rate !== "number" || !isFinite(rate)) {
+        throw new Error("Received an invalid exchange rate from the server.");
+      }
+      await updateCurrency.mutateAsync({ usdToInr: rate });
+      currencyForm.setValue("usdToInr", rate);
+      toast({ title: "Rate Updated", description: `Live rate: ₹${rate.toFixed(2)}` });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to fetch live rate.", variant: "destructive" });
     } finally {
       setIsFetchingRate(false);
     }
@@ -407,6 +515,61 @@ export default function Settings() {
                     </FormItem>
                   )} />
                 ))}
+
+                <div className="pt-2 border-t border-border/40 space-y-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" style={{ fontFamily: "'DM Mono', monospace" }}>Tax Settings</p>
+
+                  <FormField control={deductionForm.control} name="isGstRegistered" render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>GST Registered</FormLabel>
+                          <FormDescription className="text-xs">I am registered under GST and collect GST from clients.</FormDescription>
+                        </div>
+                        <FormControl>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={field.value}
+                            onClick={() => field.onChange(!field.value)}
+                            className={cn(
+                              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
+                              field.value ? "bg-primary" : "bg-muted"
+                            )}
+                          >
+                            <span className={cn(
+                              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200",
+                              field.value ? "translate-x-5" : "translate-x-0"
+                            )} />
+                          </button>
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={deductionForm.control} name="taxSlabRate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Income Tax Slab Rate (%)</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}>
+                          <SelectTrigger className="h-10 rounded-xl text-sm">
+                            <SelectValue placeholder="Select slab" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0% — No tax</SelectItem>
+                            <SelectItem value="5">5% — Up to ₹5L</SelectItem>
+                            <SelectItem value="10">10% — New regime</SelectItem>
+                            <SelectItem value="15">15% — New regime</SelectItem>
+                            <SelectItem value="20">20% — Old regime ₹5–10L</SelectItem>
+                            <SelectItem value="30">30% — Above ₹10L</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormDescription className="text-xs">Used to estimate advance tax installments on the Tax page.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
                 <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   data-testid="button-save-deductions"
                   className="w-full h-10 rounded-xl text-xs font-semibold"
@@ -465,6 +628,11 @@ export default function Settings() {
               </form>
             </Form>
           </SectionCard>
+
+          {/* Tax Reminders — full width */}
+          <div className="md:col-span-2">
+            <TaxRemindersCard />
+          </div>
         </motion.div>
       )}
 

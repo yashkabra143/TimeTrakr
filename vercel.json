@@ -5,9 +5,15 @@
     "functions": {
         "api/[...].ts": {
             "memory": 1024,
-            "maxDuration": 30
+            "maxDuration": 60
         }
     },
+    "crons": [
+        {
+            "path": "/api/crons/tax-reminders",
+            "schedule": "30 3 * * *"
+        }
+    ],
     "routes": [
         {
             "src": "^/api/(.*)",

@@ -2,6 +2,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
 import type { InsertProject, InsertDeduction, InsertCurrencySetting, InsertTimeEntry, InsertWithdrawal } from "@shared/schema";
 
+// Current user
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: api.getCurrentUser,
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+}
+
+export function useSendTestReminder() {
+  return useMutation({
+    mutationFn: api.sendTestReminder,
+  });
+}
+
 // CSV Imports
 export function useImportTimeEntries() {
   const queryClient = useQueryClient();

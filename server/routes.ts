@@ -7,6 +7,7 @@ import {
   insertCurrencySettingsSchema,
   insertTimeEntrySchema,
   insertWithdrawalSchema,
+  insertTdsEntrySchema,
 } from "../shared/schema.js";
 import { minutesToHoursDecimal, parseTimeInput } from "../shared/time.js";
 import { scrypt, randomBytes } from "crypto";
@@ -342,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.patch("/api/user", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { username, email, fullName, dateOfBirth, profilePicture } = req.body;
+      const { username, email, fullName, dateOfBirth, profilePicture, reminderEnabled } = req.body;
 
       // Check if new username is taken
       if (username) {
@@ -353,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      const updatedUser = await storage.updateUser(userId, { username, email, fullName, dateOfBirth, profilePicture });
+      const updatedUser = await storage.updateUser(userId, { username, email, fullName, dateOfBirth, profilePicture, reminderEnabled });
       if (!updatedUser) return res.status(500).json({ message: "Failed to update user" });
 
       const safeUser = {
@@ -493,6 +494,31 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         res.status(500).json({ message: "Internal server error" });
       }
     }
+  });
+
+  // ── Live exchange rate proxy ───────────────────────────────────────────────
+  app.get("/api/exchange-rate/live", requireAuth, async (_req, res) => {
+    try {
+      // Try Frankfurter first
+      const r = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR");
+      if (r.ok) {
+        const data = await r.json() as { rates?: { INR?: number } };
+        const rate = data.rates?.INR;
+        if (rate) return res.json({ rate });
+      }
+    } catch { /* fall through to backup */ }
+
+    try {
+      // Backup: ExchangeRate-API (no key required, 1500 req/month free)
+      const r2 = await fetch("https://open.er-api.com/v6/latest/USD");
+      if (r2.ok) {
+        const data = await r2.json() as { rates?: { INR?: number } };
+        const rate = data.rates?.INR;
+        if (rate) return res.json({ rate });
+      }
+    } catch { /* fall through */ }
+
+    res.status(502).json({ message: "Could not fetch live exchange rate. Try again later." });
   });
 
   // ── Time Entries ──────────────────────────────────────────────────────────
@@ -721,6 +747,135 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     } catch (error) {
       console.error("[ENTRIES IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
+    }
+  });
+
+  // ── Reminders (Twilio SMS / WhatsApp) ─────────────────────────────────────
+
+  app.post("/api/reminders/test", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user?.email) {
+        return res.status(400).json({ message: "No email address on your account. Add one in Profile first." });
+      }
+      if (!user.reminderEnabled) {
+        return res.status(400).json({ message: "Enable email reminders in Settings → Financials → Tax Reminders first." });
+      }
+      const { sendEmail } = await import("./email.js");
+      await sendEmail(
+        user.email,
+        "👋 Test — TimeTrakr Tax Reminders are working!",
+        `<div style="font-family:sans-serif;padding:24px"><h2>It works!</h2><p>Your advance tax email reminders are set up correctly. You'll receive alerts 7 days before, 3 days before, and on each advance tax due date.</p></div>`
+      );
+      return res.json({ sent: ["email"] });
+    } catch (error: any) {
+      console.error("[REMINDER TEST] Error:", error);
+      res.status(500).json({ message: error.message || "Failed to send test email" });
+    }
+  });
+
+  app.get("/api/crons/tax-reminders", async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { sendEmail, buildReminderEmail, getAdvanceTaxDates, getFyStartYear } = await import("./email.js");
+
+      // Today in IST (UTC+5:30)
+      const nowUtc = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const today = new Date(nowUtc.getTime() + istOffset);
+      today.setUTCHours(0, 0, 0, 0);
+
+      const fyStart = getFyStartYear(today);
+      const dueDates = getAdvanceTaxDates(fyStart);
+      const REMINDER_DAYS = [7, 3, 0];
+
+      // Find which installments need a reminder today
+      const todayTime = today.getTime();
+      const activeReminders = dueDates.flatMap((inst) => {
+        return REMINDER_DAYS
+          .filter((days) => {
+            const triggerDate = new Date(inst.dueDate.getTime() - days * 24 * 60 * 60 * 1000);
+            triggerDate.setUTCHours(0, 0, 0, 0);
+            return triggerDate.getTime() === todayTime;
+          })
+          .map((days) => ({ ...inst, daysUntil: days }));
+      });
+
+      if (activeReminders.length === 0) {
+        return res.json({ skipped: true, reason: "No reminders scheduled for today" });
+      }
+
+      const reminderUsers = await storage.getUsersWithRemindersEnabled();
+      let sent = 0;
+      let failed = 0;
+
+      for (const user of reminderUsers) {
+        if (!user.email) continue;
+
+        const entries = await storage.getTimeEntries(user.id);
+        const deductions = await storage.getDeductions(user.id);
+        const fyEntries = entries.filter((e) => getFyStartYear(new Date(e.date)) === fyStart);
+        const ytdNetInr = fyEntries.reduce((s, e) => s + (e.netInr ?? 0), 0);
+        const fromDate = new Date(fyStart, 3, 1);
+        const monthsElapsed = Math.max(1, (today.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+        const estimatedTax = (ytdNetInr / monthsElapsed) * 12 * ((deductions.taxSlabRate ?? 30) / 100);
+
+        for (const reminder of activeReminders) {
+          const dueDateStr = reminder.dueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+          const { subject, html } = buildReminderEmail(reminder.daysUntil, reminder.label, estimatedTax * reminder.cumulativePct, dueDateStr);
+          try {
+            await sendEmail(user.email, subject, html);
+            sent++;
+          } catch (err) {
+            console.error(`[CRON] Failed to email user ${user.id}:`, err);
+            failed++;
+          }
+        }
+      }
+
+      return res.json({ sent, failed, usersProcessed: reminderUsers.length, remindersToday: activeReminders.length });
+    } catch (error) {
+      console.error("[CRON TAX REMINDERS] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ── TDS Entries ───────────────────────────────────────────────────────────
+  app.get("/api/tds-entries", requireAuth, async (req, res) => {
+    try {
+      const entries = await storage.getTdsEntries(req.session.userId!);
+      res.json(entries);
+    } catch (error) {
+      console.error("[TDS GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/tds-entries", requireAuth, async (req, res) => {
+    try {
+      const validated = insertTdsEntrySchema.parse(req.body);
+      const entry = await storage.createTdsEntry(validated, req.session.userId!);
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid data", errors: error.errors });
+      } else {
+        console.error("[TDS POST] Error:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.delete("/api/tds-entries/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteTdsEntry(req.params.id, req.session.userId!);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[TDS DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
