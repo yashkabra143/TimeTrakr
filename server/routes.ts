@@ -782,11 +782,15 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     try {
       const { sendEmail, buildReminderEmail, getAdvanceTaxDates, getFyStartYear } = await import("./email.js");
 
-      // Today in IST (UTC+5:30)
-      const nowUtc = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const today = new Date(nowUtc.getTime() + istOffset);
-      today.setUTCHours(0, 0, 0, 0);
+      // Today in IST — derive calendar date explicitly to avoid fixed-offset errors near midnight
+      const istParts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric", month: "2-digit", day: "2-digit",
+      }).formatToParts(new Date());
+      const istYear  = Number(istParts.find(p => p.type === "year")!.value);
+      const istMonth = Number(istParts.find(p => p.type === "month")!.value);
+      const istDay   = Number(istParts.find(p => p.type === "day")!.value);
+      const today = new Date(Date.UTC(istYear, istMonth - 1, istDay, 0, 0, 0));
 
       const fyStart = getFyStartYear(today);
       const dueDates = getAdvanceTaxDates(fyStart);
