@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
+import { registerSubscriptionRoutes } from "./subscription-routes.js";
 import {
   insertProjectSchema,
   insertDeductionSchema,
@@ -1017,6 +1018,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── Catch-all (production) ────────────────────────────────────────────────
+  registerSubscriptionRoutes(app);
+
   if (process.env.NODE_ENV === "production" || isServerless) {
     app.all("*", (req, res) => {
       if (!res.headersSent) {

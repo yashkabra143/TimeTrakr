@@ -91,6 +91,7 @@ export interface IStorage {
   updateUserPlan(userId: string, planType: string, planExpiresAt: Date | null, razorpaySubId: string | null): Promise<User | undefined>;
   getWebhookEvent(eventId: string): Promise<WebhookEvent | undefined>;
   createWebhookEvent(event: { eventId: string; eventType: string; payload: string; processed: boolean }): Promise<WebhookEvent>;
+  getUserByRazorpaySubId(subId: string): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -462,6 +463,14 @@ export class DatabaseStorage implements IStorage {
       .values(event)
       .returning();
     return created;
+  }
+
+  async getUserByRazorpaySubId(subId: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.razorpaySubId, subId));
+    return user ?? undefined;
   }
 }
 
