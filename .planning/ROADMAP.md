@@ -47,14 +47,14 @@ TimeTrakr is launching as the only earnings tracker built for Indian freelancers
   3. Free tier user hits a paywall when accessing Pro features
   4. Webhook handles payment confirmation and activates Pro access
   5. User can view subscription status and manage billing
-**Plans:** 2/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 - [x] 02-01-PLAN.md — Foundation: schema, middleware, dependencies, session types
 - [x] 02-02-PLAN.md — Server-side Razorpay subscription routes and webhook handler
-- [ ] 02-03-PLAN.md — Client-side gating components (ProGate, UpgradeModal, ProLockOverlay) and API hooks
-- [ ] 02-04-PLAN.md — Billing page with plan status, upgrade CTA, and cancellation
-- [ ] 02-05-PLAN.md — Apply feature gating to tax page, CSV import, email reminders, and cron
+- [x] 02-03-PLAN.md — Client-side gating components (ProGate, UpgradeModal, ProLockOverlay) and API hooks
+- [x] 02-04-PLAN.md — Billing page with plan status, upgrade CTA, and cancellation
+- [x] 02-05-PLAN.md — Apply feature gating to tax page, CSV import, email reminders, and cron
 - [ ] 02-06-PLAN.md — CA-ready PDF export feature using @react-pdf/renderer
 
 ### Phase 3: FX Rate Advisor
@@ -105,7 +105,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 0. Foundation Fix | - | Complete | 2026-03 |
 | 1. Tax Intelligence | - | Complete | 2026-03 |
-| 2. Monetization Layer | 2/6 | In Progress|  |
+| 2. Monetization Layer | 5/6 | In Progress|  |
 | 3. FX Rate Advisor | 0/TBD | Not started | - |
 | 4. Beta Launch | 0/TBD | Not started | - |
 | 5. Growth & Marketing | 0/TBD | Not started | - |
