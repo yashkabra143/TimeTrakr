@@ -4,9 +4,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { useImportTimeEntries, useImportWithdrawals } from "@/lib/hooks";
+import { useImportTimeEntries, useImportWithdrawals, useIsPro } from "@/lib/hooks";
 import type { ImportResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 type ImportResultEx = ImportResult & { skipped?: number };
 
@@ -181,7 +182,9 @@ export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<ImportResultEx | null>(null);
   const [csvText, setCsvText] = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
+  const isPro = useIsPro();
   const importEntries = useImportTimeEntries();
   const importWithdrawals = useImportWithdrawals();
 
@@ -202,6 +205,23 @@ export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
 
   const handleReset = () => { setResult(null); setCsvText(null); };
   const handleOpenChange = (v: boolean) => { setOpen(v); if (!v) { setResult(null); setCsvText(null); } };
+
+  if (!isPro) {
+    return (
+      <>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setShowUpgrade(true)}
+          className="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-semibold border border-border/60 bg-card hover:bg-muted/50 transition-colors"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <Upload className="w-3.5 h-3.5" /> Import CSV
+        </motion.button>
+        <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} featureName="CSV Import" />
+      </>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

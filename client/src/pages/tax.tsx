@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { ProGate } from "@/components/pro-gate";
 import { useToast } from "@/hooks/use-toast";
 import {
   Calculator, Receipt, FileText, Plus, Trash2, Printer,
@@ -328,54 +329,57 @@ export default function TaxPage() {
         </motion.div>
 
         {/* ── GST Tracker ──────────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="bg-card rounded-2xl border border-border p-6"
-        >
-          <SectionHeader
-            icon={TrendingUp}
-            title="GST Tracker"
-            subtitle={isGstRegistered ? "GST paid on platform fees (Input Tax Credit available)" : "Enable GST registration in Settings → Financials to track ITC"}
-          />
+        <ProGate mode="blur" featureName="GST Tracker">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="bg-card rounded-2xl border border-border p-6"
+          >
+            <SectionHeader
+              icon={TrendingUp}
+              title="GST Tracker"
+              subtitle={isGstRegistered ? "GST paid on platform fees (Input Tax Credit available)" : "Enable GST registration in Settings → Financials to track ITC"}
+            />
 
-          {!isGstRegistered ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/40 border border-border/60">
-              <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                GST registration not enabled. Go to <strong>Settings → Financials</strong> and toggle "GST Registered" to track quarterly ITC.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {["Q1", "Q2", "Q3", "Q4"].map((q) => {
-                const key = `${q} ${fyLabel(fy)}`;
-                const amt = quarterlyGst[key] ?? 0;
-                return (
-                  <div key={q} className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20">
-                    <div>
-                      <p className="text-sm font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>{key}</p>
-                      <p className="text-[11px] text-muted-foreground">GST paid on platform fees (18%) — ITC claimable in GSTR-3B</p>
+            {!isGstRegistered ? (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/40 border border-border/60">
+                <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                <p className="text-sm text-muted-foreground" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  GST registration not enabled. Go to <strong>Settings → Financials</strong> and toggle "GST Registered" to track quarterly ITC.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {["Q1", "Q2", "Q3", "Q4"].map((q) => {
+                  const key = `${q} ${fyLabel(fy)}`;
+                  const amt = quarterlyGst[key] ?? 0;
+                  return (
+                    <div key={q} className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20">
+                      <div>
+                        <p className="text-sm font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>{key}</p>
+                        <p className="text-[11px] text-muted-foreground">GST paid on platform fees (18%) — ITC claimable in GSTR-3B</p>
+                      </div>
+                      <p className="text-base font-bold text-blue-600" style={{ fontFamily: "'DM Mono', monospace" }}>{fmt(amt)}</p>
                     </div>
-                    <p className="text-base font-bold text-blue-600" style={{ fontFamily: "'DM Mono', monospace" }}>{fmt(amt)}</p>
-                  </div>
-                );
-              })}
-              <p className="text-[11px] text-muted-foreground mt-2 italic">
-                * Upwork export income is zero-rated (0% GST). The amounts above are GST paid TO Upwork on their service fees — claimable as Input Tax Credit.
-              </p>
-            </div>
-          )}
-        </motion.div>
+                  );
+                })}
+                <p className="text-[11px] text-muted-foreground mt-2 italic">
+                  * Upwork export income is zero-rated (0% GST). The amounts above are GST paid TO Upwork on their service fees — claimable as Input Tax Credit.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </ProGate>
 
         {/* ── TDS Summary ───────────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="bg-card rounded-2xl border border-border p-6"
-        >
+        <ProGate mode="blur" featureName="TDS Reconciliation">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="bg-card rounded-2xl border border-border p-6"
+          >
           <SectionHeader
             icon={Receipt}
             title="TDS Summary"
@@ -498,7 +502,8 @@ export default function TaxPage() {
               {fmt(totals.platformTdsInr + indianTdsTotal)}
             </p>
           </div>
-        </motion.div>
+          </motion.div>
+        </ProGate>
 
         {/* ── CA Export Preview ─────────────────────────────────────────── */}
         <motion.div

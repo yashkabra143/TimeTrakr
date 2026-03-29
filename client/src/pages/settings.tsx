@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject, useCurrentUser, useUpdateUser, useSendTestReminder } from "@/lib/hooks";
+import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject, useCurrentUser, useUpdateUser, useSendTestReminder, useIsPro } from "@/lib/hooks";
 import { useEffect, useState } from "react";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import { motion } from "framer-motion";
 import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,8 @@ function TaxRemindersCard() {
   const sendTest = useSendTestReminder();
   const { toast } = useToast();
   const [enabled, setEnabled] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const isPro = useIsPro();
 
   useEffect(() => {
     if (me?.user) setEnabled(me.user.reminderEnabled ?? false);
@@ -108,6 +111,7 @@ function TaxRemindersCard() {
   const hasEmail = !!me?.user?.email;
 
   return (
+    <>
     <SectionCard
       title="Tax Reminders"
       description="Get email alerts before advance tax due dates (Jun 15, Sep 15, Dec 15, Mar 15)."
@@ -135,7 +139,10 @@ function TaxRemindersCard() {
             role="switch"
             aria-checked={enabled}
             disabled={!hasEmail}
-            onClick={() => setEnabled(!enabled)}
+            onClick={() => {
+              if (!isPro) { setShowUpgrade(true); return; }
+              setEnabled(!enabled);
+            }}
             className={cn(
               "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
               enabled ? "bg-primary" : "bg-muted"
@@ -175,6 +182,8 @@ function TaxRemindersCard() {
         </div>
       </div>
     </SectionCard>
+    <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} featureName="Tax Email Reminders" />
+    </>
   );
 }
 
