@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   googleId: text("google_id").unique(),
   githubId: text("github_id").unique(),
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
+  planType: text("plan_type").notNull().default("free"),
+  planExpiresAt: timestamp("plan_expires_at"),
+  razorpaySubId: text("razorpay_sub_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -94,6 +97,15 @@ export const tdsEntries = pgTable("tds_entries", {
   certificateNumber: text("certificate_number"),
   quarter: text("quarter").notNull(),       // e.g. "Q1 FY2025-26"
   date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webhookEvents = pgTable("webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: text("event_id").notNull().unique(),
+  eventType: text("event_type").notNull(),
+  payload: text("payload").notNull(),
+  processed: boolean("processed").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -192,3 +204,10 @@ export const insertTdsEntrySchema = createInsertSchema(tdsEntries).omit({
 
 export type TdsEntry = typeof tdsEntries.$inferSelect;
 export type InsertTdsEntry = z.infer<typeof insertTdsEntrySchema>;
+
+export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;

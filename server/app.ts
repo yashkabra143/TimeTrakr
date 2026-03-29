@@ -17,6 +17,8 @@ declare module "express-session" {
       fullName?: string | null;
       dateOfBirth?: string | null;
       profilePicture?: string | null;
+      planType: string;
+      planExpiresAt: string | null;
     };
   }
 }

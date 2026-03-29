@@ -6,6 +6,7 @@ import {
   tdsEntries,
   users,
   withdrawals,
+  webhookEvents,
   type Project,
   type InsertProject,
   type Deduction,
@@ -20,6 +21,7 @@ import {
   type InsertUser,
   type Withdrawal,
   type InsertWithdrawal,
+  type WebhookEvent,
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and, isNull, isNotNull } from "drizzle-orm";
@@ -84,6 +86,11 @@ export interface IStorage {
   createWithdrawal(withdrawal: InsertWithdrawal, userId: string): Promise<Withdrawal>;
   updateWithdrawalStatus(id: string, status: string, userId: string): Promise<Withdrawal | undefined>;
   deleteWithdrawal(id: string, userId: string): Promise<void>;
+
+  // Subscriptions / Webhook events
+  updateUserPlan(userId: string, planType: string, planExpiresAt: Date | null, razorpaySubId: string | null): Promise<User | undefined>;
+  getWebhookEvent(eventId: string): Promise<WebhookEvent | undefined>;
+  createWebhookEvent(event: { eventId: string; eventType: string; payload: string; processed: boolean }): Promise<WebhookEvent>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -428,6 +435,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTdsEntry(id: string, userId: string): Promise<void> {
     await db.delete(tdsEntries).where(and(eq(tdsEntries.id, id), eq(tdsEntries.userId, userId)));
+  }
+
+  // ── Subscriptions / Webhook events ───────────────────────────────────────
+
+  async updateUserPlan(userId: string, planType: string, planExpiresAt: Date | null, razorpaySubId: string | null): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ planType, planExpiresAt, razorpaySubId })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated ?? undefined;
+  }
+
+  async getWebhookEvent(eventId: string): Promise<WebhookEvent | undefined> {
+    const [event] = await db
+      .select()
+      .from(webhookEvents)
+      .where(eq(webhookEvents.eventId, eventId));
+    return event ?? undefined;
+  }
+
+  async createWebhookEvent(event: { eventId: string; eventType: string; payload: string; processed: boolean }): Promise<WebhookEvent> {
+    const [created] = await db
+      .insert(webhookEvents)
+      .values(event)
+      .returning();
+    return created;
   }
 }
 

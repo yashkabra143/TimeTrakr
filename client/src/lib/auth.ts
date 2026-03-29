@@ -5,6 +5,8 @@ export interface User {
   fullName?: string | null;
   dateOfBirth?: string | null;
   profilePicture?: string | null;
+  planType: string;
+  planExpiresAt: string | null;
 }
 
 export async function checkAuth(): Promise<User | null> {

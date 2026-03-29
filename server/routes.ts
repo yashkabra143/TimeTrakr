@@ -26,6 +26,23 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+function requirePro(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: "Unauthorized — please log in" });
+  }
+  const user = req.session.user;
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized — please log in" });
+  }
+  const isPro =
+    user.planType !== "free" &&
+    (user.planExpiresAt === null || new Date(user.planExpiresAt) > new Date());
+  if (!isPro) {
+    return res.status(403).json({ message: "Pro subscription required", code: "PRO_REQUIRED" });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server | null> {
   console.log("[ROUTES] Starting registration...", { isServerless });
 
@@ -89,6 +106,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         fullName: user.fullName,
         dateOfBirth: user.dateOfBirth,
         profilePicture: user.profilePicture,
+        planType: user.planType ?? "free",
+        planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
 
       // Auto-login after register
@@ -128,6 +147,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         fullName: user.fullName,
         dateOfBirth: user.dateOfBirth,
         profilePicture: user.profilePicture,
+        planType: user.planType ?? "free",
+        planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
 
       // Set session
@@ -162,6 +183,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         fullName: user.fullName,
         dateOfBirth: user.dateOfBirth,
         profilePicture: user.profilePicture,
+        planType: user.planType ?? "free",
+        planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
       // Keep session user in sync
       req.session.user = safeUser;
@@ -235,6 +258,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       req.session.user = {
         id: user.id, username: user.username, email: user.email,
         fullName: user.fullName, dateOfBirth: user.dateOfBirth, profilePicture: user.profilePicture,
+        planType: user.planType ?? "free",
+        planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
       res.redirect("/");
     } catch (err) {
@@ -298,6 +323,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       req.session.user = {
         id: user.id, username: user.username, email: user.email,
         fullName: user.fullName, dateOfBirth: user.dateOfBirth, profilePicture: user.profilePicture,
+        planType: user.planType ?? "free",
+        planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
       res.redirect("/");
     } catch (err) {
@@ -364,6 +391,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         fullName: updatedUser.fullName,
         dateOfBirth: updatedUser.dateOfBirth,
         profilePicture: updatedUser.profilePicture,
+        planType: updatedUser.planType ?? "free",
+        planExpiresAt: updatedUser.planExpiresAt?.toISOString() ?? null,
       };
 
       // Refresh session user
