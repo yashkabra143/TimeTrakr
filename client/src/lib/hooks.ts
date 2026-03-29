@@ -183,3 +183,47 @@ export function useDeleteWithdrawal() {
     },
   });
 }
+
+// Subscriptions
+export function useSubscriptionStatus() {
+  return useQuery({
+    queryKey: ["subscription-status"],
+    queryFn: api.getSubscriptionStatus,
+  });
+}
+
+export function useCreateSubscription() {
+  return useMutation({
+    mutationFn: (planType: "monthly" | "annual") => api.createSubscription(planType),
+  });
+}
+
+export function useVerifySubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.verifySubscription,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      queryClient.invalidateQueries({ queryKey: ["subscription-status"] });
+    },
+  });
+}
+
+export function useCancelSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.cancelSubscription,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      queryClient.invalidateQueries({ queryKey: ["subscription-status"] });
+    },
+  });
+}
+
+export function useIsPro(): boolean {
+  const { data: user } = useCurrentUser();
+  if (!user) return false;
+  if (user.planType === "free") return false;
+  if (user.planExpiresAt && new Date(user.planExpiresAt) <= new Date()) return false;
+  return true;
+}

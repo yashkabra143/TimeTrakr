@@ -186,3 +186,56 @@ export async function importWithdrawalsCSV(csv: string): Promise<ImportResult> {
   if (!response.ok) throw new Error(await response.text());
   return response.json();
 }
+
+// Subscriptions
+export async function createSubscription(planType: "monthly" | "annual"): Promise<{ subscriptionId: string }> {
+  const response = await fetch(`${API_URL}/subscriptions/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ planType }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || "Failed to create subscription");
+  }
+  return response.json();
+}
+
+export async function verifySubscription(data: {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+}): Promise<{ success: boolean; planType: string }> {
+  const response = await fetch(`${API_URL}/subscriptions/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || "Payment verification failed");
+  }
+  return response.json();
+}
+
+export async function cancelSubscription(): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_URL}/subscriptions/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || "Failed to cancel subscription");
+  }
+  return response.json();
+}
+
+export async function getSubscriptionStatus(): Promise<{
+  planType: string;
+  planExpiresAt: string | null;
+  razorpaySubId: string | null;
+}> {
+  const response = await fetch(`${API_URL}/subscriptions/status`);
+  if (!response.ok) throw new Error("Failed to fetch subscription status");
+  return response.json();
+}
