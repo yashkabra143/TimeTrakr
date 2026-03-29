@@ -373,6 +373,16 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       const userId = req.session.userId!;
       const { username, email, fullName, dateOfBirth, profilePicture, reminderEnabled } = req.body;
 
+      // Gate reminder toggle behind Pro subscription
+      if (reminderEnabled === true) {
+        const sessionUser = req.session?.user;
+        const isPro = sessionUser && sessionUser.planType !== "free" &&
+          (sessionUser.planExpiresAt === null || new Date(sessionUser.planExpiresAt) > new Date());
+        if (!isPro) {
+          return res.status(403).json({ message: "Pro subscription required for email reminders", code: "PRO_REQUIRED" });
+        }
+      }
+
       // Check if new username is taken
       if (username) {
         const current = await storage.getUserById(userId);
@@ -638,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── CSV Import: Time Entries ───────────────────────────────────────────────
-  app.post("/api/entries/import", requireAuth, async (req, res) => {
+  app.post("/api/entries/import", requireAuth, requirePro, async (req, res) => {
     try {
       const userId = req.session.userId!;
       const { csv } = req.body as { csv: string };
@@ -843,10 +853,14 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       }
 
       const reminderUsers = await storage.getUsersWithRemindersEnabled();
+      const proUsers = reminderUsers.filter(u =>
+        u.planType !== "free" &&
+        (u.planExpiresAt === null || (u.planExpiresAt && new Date(u.planExpiresAt) > new Date()))
+      );
       let sent = 0;
       let failed = 0;
 
-      for (const user of reminderUsers) {
+      for (const user of proUsers) {
         if (!user.email) continue;
 
         const entries = await storage.getTimeEntries(user.id);
@@ -870,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      return res.json({ sent, failed, usersProcessed: reminderUsers.length, remindersToday: activeReminders.length });
+      return res.json({ sent, failed, usersProcessed: proUsers.length, remindersToday: activeReminders.length });
     } catch (error) {
       console.error("[CRON TAX REMINDERS] Error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -878,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── TDS Entries ───────────────────────────────────────────────────────────
-  app.get("/api/tds-entries", requireAuth, async (req, res) => {
+  app.get("/api/tds-entries", requireAuth, requirePro, async (req, res) => {
     try {
       const entries = await storage.getTdsEntries(req.session.userId!);
       res.json(entries);
@@ -888,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.post("/api/tds-entries", requireAuth, async (req, res) => {
+  app.post("/api/tds-entries", requireAuth, requirePro, async (req, res) => {
     try {
       const validated = insertTdsEntrySchema.parse(req.body);
       const entry = await storage.createTdsEntry(validated, req.session.userId!);
@@ -903,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
-  app.delete("/api/tds-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/tds-entries/:id", requireAuth, requirePro, async (req, res) => {
     try {
       await storage.deleteTdsEntry(req.params.id, req.session.userId!);
       res.status(204).send();
@@ -964,7 +978,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── CSV Import: Withdrawals ───────────────────────────────────────────────
-  app.post("/api/withdrawals/import", requireAuth, async (req, res) => {
+  app.post("/api/withdrawals/import", requireAuth, requirePro, async (req, res) => {
     try {
       const userId = req.session.userId!;
       const { csv } = req.body as { csv: string };
