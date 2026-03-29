@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Zap,
   Calendar,
+  CreditCard,
   Settings,
   Menu,
   X,
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { label: "Weekly", href: "/weekly", icon: Calendar },
   { label: "History", href: "/history", icon: History },
   { label: "Tax", href: "/tax", icon: FileText },
+  { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

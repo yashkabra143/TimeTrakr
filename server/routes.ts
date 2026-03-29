@@ -136,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      const hashedPassword = (await scryptAsync(password, user.salt, 64)) as Buffer;
+      const hashedPassword = (await scryptAsync(password, user.salt!, 64)) as Buffer;
       if (hashedPassword.toString("hex") !== user.password) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
