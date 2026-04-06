@@ -57,8 +57,12 @@ export function registerSubscriptionRoutes(app: Express) {
 
       const planId =
         planType === "annual"
-          ? process.env.RAZORPAY_PLAN_ANNUAL_ID!
-          : process.env.RAZORPAY_PLAN_MONTHLY_ID!;
+          ? process.env.RAZORPAY_PLAN_ANNUAL_ID
+          : process.env.RAZORPAY_PLAN_MONTHLY_ID;
+
+      if (!planId) {
+        return res.status(500).json({ message: `RAZORPAY_PLAN_${planType.toUpperCase()}_ID is not configured` });
+      }
 
       const subscription = await getRazorpay().subscriptions.create({
         plan_id: planId,

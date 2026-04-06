@@ -205,8 +205,8 @@ export function TaxPDFReport({ data }: { data: TaxReportData }) {
               <Text style={styles.cellRight}>Cumulative %</Text>
               <Text style={styles.cellRight}>Amount</Text>
             </View>
-            {data.installments.map((inst, i) => (
-              <View key={i} style={styles.tableRow}>
+            {data.installments.map((inst) => (
+              <View key={inst.label} style={styles.tableRow}>
                 <Text style={styles.cell}>{inst.label}</Text>
                 <Text style={styles.cell}>{inst.dueDate}</Text>
                 <Text style={styles.cellRight}>{inst.cumPct}%</Text>
@@ -225,8 +225,8 @@ export function TaxPDFReport({ data }: { data: TaxReportData }) {
                 <Text style={styles.cell}>Quarter</Text>
                 <Text style={styles.cellRight}>GST Paid (ITC)</Text>
               </View>
-              {Object.entries(data.quarterlyGst).map(([quarter, amount], i) => (
-                <View key={i} style={styles.tableRow}>
+              {Object.entries(data.quarterlyGst).map(([quarter, amount]) => (
+                <View key={quarter} style={styles.tableRow}>
                   <Text style={styles.cell}>{quarter}</Text>
                   <Text style={styles.cellRight}>{fmt(amount)}</Text>
                 </View>
@@ -246,8 +246,8 @@ export function TaxPDFReport({ data }: { data: TaxReportData }) {
                 <Text style={styles.cellRight}>Gross (INR)</Text>
                 <Text style={styles.cellRight}>TDS (INR)</Text>
               </View>
-              {data.tdsEntries.map((entry, i) => (
-                <View key={i} style={styles.tableRow}>
+              {data.tdsEntries.map((entry) => (
+                <View key={`${entry.deductorName}-${entry.quarter}`} style={styles.tableRow}>
                   <Text style={{ ...styles.cell, flex: 2 }}>{entry.deductorName}</Text>
                   <Text style={styles.cell}>{entry.quarter}</Text>
                   <Text style={styles.cellRight}>{fmt(entry.grossAmount)}</Text>
@@ -277,6 +277,8 @@ export async function downloadTaxPDF(data: TaxReportData): Promise<void> {
   const a = document.createElement("a");
   a.href = url;
   a.download = `timetrakr-tax-report-${data.fy.replace(/\s/g, "-")}.pdf`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
