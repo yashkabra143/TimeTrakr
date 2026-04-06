@@ -2,7 +2,10 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ProGate } from "@/components/pro-gate";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import { useToast } from "@/hooks/use-toast";
+import { useIsPro } from "@/lib/hooks";
+import { downloadTaxPDF, type TaxReportData } from "@/components/tax-pdf-report";
 import {
   Calculator, Receipt, FileText, Plus, Trash2, Printer,
   TrendingUp, AlertCircle, CheckCircle2, Clock, ChevronDown,
@@ -103,8 +106,11 @@ export default function TaxPage() {
   const [fy, setFY] = useState(currentFY);
   const [showTdsForm, setShowTdsForm] = useState(false);
   const [tdsForm, setTdsForm] = useState({ deductorName: "", panNumber: "", amount: "", grossAmount: "", certificateNumber: "", date: "", quarter: "" });
+  const [showUpgradeForPdf, setShowUpgradeForPdf] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const isPro = useIsPro();
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const { data: entries = [] } = useQuery<any[]>({ queryKey: ["/api/entries"], queryFn: () => apiRequest("GET", "/api/entries") });
@@ -201,7 +207,51 @@ export default function TaxPage() {
     });
   }
 
-  function handlePrint() { window.print(); }
+  async function handleExportPdf() {
+    if (!isPro) {
+      setShowUpgradeForPdf(true);
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const reportData: TaxReportData = {
+        fy: fyLabel(fy),
+        generatedDate: today.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+        grossUsd: totals.grossUsd,
+        netUsd: totals.netUsd,
+        netInr: totals.netInr,
+        platformTdsInr: totals.platformTdsInr,
+        gstPaidInr: totals.gstPaidInr,
+        taxSlabRate,
+        estimatedTax,
+        projectedAnnualInr,
+        installments: installments.map(inst => ({
+          label: inst.label,
+          dueDate: inst.dueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+          cumPct: inst.cumPct,
+          payNow: inst.payNow,
+          isPast: inst.isPast,
+        })),
+        isGstRegistered,
+        quarterlyGst,
+        indianTdsTotal,
+        totalTdsCredit: totals.platformTdsInr + indianTdsTotal,
+        tdsEntries: fyTdsEntries.map((e: any) => ({
+          deductorName: e.deductorName,
+          amount: e.amount,
+          grossAmount: e.grossAmount,
+          quarter: e.quarter,
+          panNumber: e.panNumber ?? null,
+          certificateNumber: e.certificateNumber ?? null,
+        })),
+      };
+      await downloadTaxPDF(reportData);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -247,12 +297,13 @@ export default function TaxPage() {
             </div>
 
             <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl bg-amber-500 text-amber-950 text-sm font-semibold hover:bg-amber-400 transition-colors"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="flex items-center gap-2 h-9 px-4 rounded-xl bg-amber-500 text-amber-950 text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50"
               style={{ fontFamily: "'Manrope', sans-serif" }}
             >
               <Printer className="w-3.5 h-3.5" />
-              Export PDF
+              {isExporting ? "Generating..." : "Export PDF"}
             </button>
           </div>
         </div>
@@ -553,12 +604,13 @@ export default function TaxPage() {
           </p>
 
           <button
-            onClick={handlePrint}
-            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl bg-amber-500 text-amber-950 text-sm font-semibold hover:bg-amber-400 transition-colors print:hidden"
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl bg-amber-500 text-amber-950 text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 print:hidden"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             <Printer className="w-3.5 h-3.5" />
-            Print / Save as PDF
+            {isExporting ? "Generating..." : "Export PDF"}
           </button>
         </motion.div>
       </div>
@@ -573,6 +625,8 @@ export default function TaxPage() {
           button { display: none !important; }
         }
       `}</style>
+
+      <UpgradeModal open={showUpgradeForPdf} onOpenChange={setShowUpgradeForPdf} featureName="PDF Export" />
     </>
   );
 }
