@@ -82,6 +82,16 @@ my-video/
 attached_assets/
 
 # ============================
+# AI Tool Configs
+# ============================
+.cursor/
+.cursorrules
+.opencode.json
+.windsurfrules
+AGENTS.md
+GEMINI.md
+
+# ============================
 # TypeScript
 # ============================
 *.tsbuildinfo

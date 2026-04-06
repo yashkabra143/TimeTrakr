@@ -3,11 +3,20 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { storage } from "./storage.js";
 
-// ── Razorpay SDK initialization ───────────────────────────────────────────────
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+// ── Razorpay SDK initialization (lazy — only instantiated when keys are present) ─
+let _razorpay: Razorpay | null = null;
+function getRazorpay(): Razorpay {
+  if (!_razorpay) {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error("Razorpay keys not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env");
+    }
+    _razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return _razorpay;
+}
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -51,7 +60,7 @@ export function registerSubscriptionRoutes(app: Express) {
           ? process.env.RAZORPAY_PLAN_ANNUAL_ID!
           : process.env.RAZORPAY_PLAN_MONTHLY_ID!;
 
-      const subscription = await razorpay.subscriptions.create({
+      const subscription = await getRazorpay().subscriptions.create({
         plan_id: planId,
         total_count: 120,
         quantity: 1,
@@ -95,7 +104,7 @@ export function registerSubscriptionRoutes(app: Express) {
       }
 
       // Fetch subscription to determine plan type and expiry
-      const sub = await razorpay.subscriptions.fetch(razorpay_subscription_id) as any;
+      const sub = await getRazorpay().subscriptions.fetch(razorpay_subscription_id) as any;
 
       let planType: string;
       if (sub.plan_id === process.env.RAZORPAY_PLAN_ANNUAL_ID) {
@@ -142,7 +151,7 @@ export function registerSubscriptionRoutes(app: Express) {
       }
 
       // cancel_at_cycle_end: 1 — access continues until period end (D-13)
-      await razorpay.subscriptions.cancel(razorpaySubId, { cancel_at_cycle_end: 1 } as any);
+      await getRazorpay().subscriptions.cancel(razorpaySubId, { cancel_at_cycle_end: 1 } as any);
 
       // Do NOT update planType/planExpiresAt here — webhook subscription.cancelled handles this.
       return res.status(200).json({

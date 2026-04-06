@@ -62,17 +62,9 @@ export const useAuthStore = create<AuthState>((set) => ({
                 localStorage.setItem('user', JSON.stringify(user));
                 set({ user, isAuthenticated: true, isLoading: false });
             } else {
-                // If checkAuth fails (e.g. session expired), clear local storage unless we want to keep it for offline mode
-                // For now, let's keep it if checkAuth returns null (not authenticated)
-                if (!storedUser) {
-                    set({ user: null, isAuthenticated: false, isLoading: false });
-                } else {
-                    // If we have stored user but checkAuth failed, we might want to keep the user logged in visually 
-                    // but they might fail API calls. 
-                    // Given the current setup without real session cookies, checkAuth returns null.
-                    // So we rely on localStorage.
-                    set({ isLoading: false });
-                }
+                // Session is gone (expired or never existed) — clear everything and redirect to login
+                localStorage.removeItem('user');
+                set({ user: null, isAuthenticated: false, isLoading: false });
             }
         } catch (error) {
             console.error('Auth initialization error:', error);
