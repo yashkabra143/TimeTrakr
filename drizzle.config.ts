@@ -11,5 +11,5 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
-  tablesFilter: ["!session"],
+  tablesFilter: ["users", "projects", "deductions", "currency_settings", "time_entries", "Withdrawl", "tds_entries", "webhook_events"],
 });
