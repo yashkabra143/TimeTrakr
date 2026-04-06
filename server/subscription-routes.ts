@@ -68,9 +68,10 @@ export function registerSubscriptionRoutes(app: Express) {
       });
 
       return res.status(200).json({ subscriptionId: subscription.id });
-    } catch (error) {
-      console.error("[SUBSCRIPTIONS CREATE] Error:", error);
-      return res.status(500).json({ message: "Failed to create subscription" });
+    } catch (error: any) {
+      console.error("[SUBSCRIPTIONS CREATE] Error:", error?.message ?? error);
+      const msg = error?.message ?? "Failed to create subscription";
+      return res.status(500).json({ message: msg });
     }
   });
 
