@@ -14,6 +14,7 @@ import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import LandingPage from "@/pages/landing";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEffect } from "react";
 
@@ -65,9 +66,9 @@ function App() {
           {isAuthenticated ? <Redirect to="/" /> : <Register />}
         </Route>
 
-        {/* Protected routes */}
+        {/* "/" — landing for guests, dashboard for authenticated users */}
         <Route path="/">
-          <ProtectedRoute component={Dashboard} />
+          {isAuthenticated ? <ProtectedRoute component={Dashboard} /> : <LandingPage />}
         </Route>
         <Route path="/quick-entry">
           <ProtectedRoute component={QuickEntry} />

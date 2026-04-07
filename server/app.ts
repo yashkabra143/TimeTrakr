@@ -78,14 +78,6 @@ app.use(
   })
 );
 
-// ── Debug logging middleware ──────────────────────────────────────────────
-app.use((req, _res, next) => {
-  console.log(`[DEBUG] ${req.method} ${req.path}`, {
-    sessionUserId: req.session?.userId ?? "none",
-    body: req.body ? "has body" : "no body",
-  });
-  next();
-});
 
 export default async function runApp(
   setup: (app: Express, server: Server | null) => Promise<void>,

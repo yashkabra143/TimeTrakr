@@ -11,7 +11,7 @@ import {
   insertTdsEntrySchema,
 } from "../shared/schema.js";
 import { minutesToHoursDecimal, parseTimeInput } from "../shared/time.js";
-import { scrypt, randomBytes } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { z } from "zod";
 
@@ -57,19 +57,6 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     res.json({ status: "pong", timestamp: Date.now() });
   });
 
-  // Ensure default admin user exists (for existing single-user deployments)
-  const existingAdmin = await storage.getUser("admin");
-  if (!existingAdmin) {
-    const salt = randomBytes(16).toString("hex");
-    const hashedPassword = (await scryptAsync("password123", salt, 64)) as Buffer;
-    await storage.createUser({
-      username: "admin",
-      password: hashedPassword.toString("hex"),
-      salt,
-    });
-    console.log("[AUTH] Created default admin user");
-  }
-
   // ── Register ─────────────────────────────────────────────────────────────
   app.post("/api/register", async (req, res) => {
     try {
@@ -111,10 +98,12 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
 
-      // Auto-login after register
+      // Regenerate session to prevent session fixation, then auto-login
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       req.session.user = safeUser;
-
       return res.status(201).json({ user: safeUser });
     } catch (error) {
       console.error("[REGISTER] Error:", error);
@@ -137,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       }
 
       const hashedPassword = (await scryptAsync(password, user.salt!, 64)) as Buffer;
-      if (hashedPassword.toString("hex") !== user.password) {
+      if (!timingSafeEqual(hashedPassword, Buffer.from(user.password, "hex"))) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
@@ -152,10 +141,12 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
       };
 
-      // Set session
+      // Regenerate session to prevent session fixation
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       req.session.user = safeUser;
-
       return res.json({ user: safeUser });
     } catch (error) {
       console.error("[LOGIN] Error:", error);
@@ -255,6 +246,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         picture: profile.picture,
       });
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       req.session.user = {
         id: user.id, username: user.username, email: user.email,
@@ -320,6 +314,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         picture: profile.avatar_url,
       });
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       req.session.user = {
         id: user.id, username: user.username, email: user.email,
@@ -352,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       }
 
       const hashedCurrent = (await scryptAsync(currentPassword, user.salt, 64)) as Buffer;
-      if (hashedCurrent.toString("hex") !== user.password) {
+      if (!timingSafeEqual(hashedCurrent, Buffer.from(user.password, "hex"))) {
         return res.status(401).json({ message: "Incorrect current password" });
       }
 

@@ -104,7 +104,9 @@ export function registerSubscriptionRoutes(app: Express) {
         .update(signedString)
         .digest("hex");
 
-      if (expectedSignature !== razorpay_signature) {
+      const expectedBuf = Buffer.from(expectedSignature, "hex");
+      const actualBuf = Buffer.from(razorpay_signature, "hex");
+      if (expectedBuf.length !== actualBuf.length || !crypto.timingSafeEqual(expectedBuf, actualBuf)) {
         return res.status(400).json({ message: "Invalid payment signature" });
       }
 
@@ -210,7 +212,9 @@ export function registerSubscriptionRoutes(app: Express) {
         .update(rawBody as Buffer)
         .digest("hex");
 
-      if (expectedSignature !== signature) {
+      const expectedBuf = Buffer.from(expectedSignature, "hex");
+      const actualBuf = Buffer.from(signature, "hex");
+      if (expectedBuf.length !== actualBuf.length || !crypto.timingSafeEqual(expectedBuf, actualBuf)) {
         return res.status(400).json({ message: "Invalid webhook signature" });
       }
 
