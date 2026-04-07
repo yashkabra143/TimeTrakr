@@ -4,27 +4,36 @@ import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/auth-store";
-import { Lock, User, Mail, ArrowRight, Clock } from "lucide-react";
+import { Lock, User, Mail, ArrowRight, Clock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  if (!pw) return { score: 0, label: "", color: "" };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const labels = ["Weak", "Fair", "Good", "Strong"];
+  const colors = ["hsl(0,70%,55%)", "hsl(38,92%,50%)", "hsl(142,60%,45%)", "hsl(142,70%,38%)"];
+  return { score, label: labels[Math.min(score - 1, 3)] ?? "", color: colors[Math.min(score - 1, 3)] ?? "" };
+}
 
 export default function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [focused, setFocused] = useState<"username" | "email" | "password" | "confirm" | null>(null);
+  const [focused, setFocused] = useState<"username" | "email" | "password" | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const login = useAuthStore((state) => state.login);
 
+  const strength = getPasswordStrength(password);
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
 
-    if (password !== confirmPassword) {
-      toast({ title: "Passwords don't match", description: "Please make sure both passwords are the same.", variant: "destructive" });
-      return;
-    }
     if (password.length < 6) {
       toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
       return;
@@ -46,7 +55,7 @@ export default function Register() {
       }
 
       const data = await response.json();
-      toast({ title: "Account created!", description: "Welcome to TimeFlow." });
+      toast({ title: "Account created!", description: "Welcome to TimeTrakr." });
       login(data.user);
       navigate("/");
     } catch {
@@ -93,7 +102,7 @@ export default function Register() {
               <Clock className="w-4 h-4" style={{ color: "hsl(228,25%,9%)" }} />
             </div>
             <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "'Syne', sans-serif", color: "hsl(38,25%,95%)" }}>
-              TimeFlow
+              TimeTrakr
             </span>
           </div>
 
@@ -158,7 +167,7 @@ export default function Register() {
               <Clock className="w-3.5 h-3.5" style={{ color: "hsl(228,25%,9%)" }} />
             </div>
             <span className="text-lg font-bold" style={{ fontFamily: "'Syne', sans-serif", color: "hsl(228,25%,12%)" }}>
-              TimeFlow
+              TimeTrakr
             </span>
           </motion.div>
 
@@ -169,7 +178,7 @@ export default function Register() {
               Create account
             </p>
             <h1 className="text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: "hsl(228,25%,10%)" }}>
-              Join TimeFlow
+              Join TimeTrakr
             </h1>
             <p className="text-sm mt-1.5" style={{ color: "hsl(220,10%,48%)", fontFamily: "'Manrope', sans-serif" }}>
               Already have an account?{" "}
@@ -246,10 +255,11 @@ export default function Register() {
               </motion.div>
             </motion.div>
 
-            {/* Email (optional) */}
+            {/* Email */}
             <motion.div className="space-y-1.5" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}>
-                Email <span className="normal-case font-normal opacity-50">(optional)</span>
+              <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}>
+                Email
+                <span className="normal-case font-normal text-[10px] px-1.5 py-0.5 rounded" style={{ color: "hsl(220,10%,55%)", background: "hsl(220,15%,93%)" }}>for tax reminders</span>
               </label>
               <motion.div className="relative" animate={focused === "email" ? { scale: 1.01 } : { scale: 1 }} transition={{ duration: 0.15 }}>
                 <Mail className={cn("absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors", focused === "email" ? "text-amber-500" : "text-gray-400")} />
@@ -261,7 +271,7 @@ export default function Register() {
               </motion.div>
             </motion.div>
 
-            {/* Password */}
+            {/* Password + strength */}
             <motion.div className="space-y-1.5" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}>
               <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}>
                 Password
@@ -274,33 +284,30 @@ export default function Register() {
                   className="pl-10 h-11 rounded-xl border text-sm transition-all duration-200"
                   style={inputStyle("password")} />
               </motion.div>
-            </motion.div>
-
-            {/* Confirm Password */}
-            <motion.div className="space-y-1.5" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(228,25%,25%)", fontFamily: "'Manrope', sans-serif" }}>
-                Confirm Password
-              </label>
-              <motion.div className="relative" animate={focused === "confirm" ? { scale: 1.01 } : { scale: 1 }} transition={{ duration: 0.15 }}>
-                <Lock className={cn("absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors", focused === "confirm" ? "text-amber-500" : "text-gray-400")} />
-                <Input type="password" placeholder="Re-enter password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                  onFocus={() => setFocused("confirm")} onBlur={() => setFocused(null)}
-                  disabled={isLoading} required
-                  className="pl-10 h-11 rounded-xl border text-sm transition-all duration-200"
-                  style={inputStyle("confirm")} />
-              </motion.div>
-              {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-destructive" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                  Passwords don't match
-                </p>
+              {/* Strength meter */}
+              {password && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.2 }}>
+                  <div className="flex gap-1 mt-1.5">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
+                        style={{ background: i <= strength.score ? strength.color : "hsl(220,15%,88%)" }} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {strength.score >= 3 && <Check className="w-3 h-3" style={{ color: strength.color }} />}
+                    <p className="text-xs" style={{ color: strength.color, fontFamily: "'Manrope', sans-serif" }}>
+                      {strength.label}
+                    </p>
+                  </div>
+                </motion.div>
               )}
             </motion.div>
 
             {/* Submit */}
-            <motion.div className="pt-1" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.46 }}>
+            <motion.div className="pt-1" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
               <motion.button
                 type="submit"
-                disabled={isLoading || !username || !password || !confirmPassword}
+                disabled={isLoading || !username || !password}
                 className={cn(
                   "w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2",
                   "disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
@@ -309,7 +316,7 @@ export default function Register() {
                   fontFamily: "'Manrope', sans-serif",
                   background: "hsl(38,92%,50%)",
                   color: "hsl(228,25%,9%)",
-                  boxShadow: username && password && confirmPassword && !isLoading ? "0 4px 20px hsl(38,92%,50%,0.4)" : "none",
+                  boxShadow: username && password && !isLoading ? "0 4px 20px hsl(38,92%,50%,0.4)" : "none",
                 }}
                 whileHover={!isLoading ? { scale: 1.02, boxShadow: "0 6px 28px hsl(38,92%,50%,0.5)" } : {}}
                 whileTap={!isLoading ? { scale: 0.97 } : {}}
@@ -338,7 +345,7 @@ export default function Register() {
             style={{ color: "hsl(220,10%,40%)", fontFamily: "'Manrope', sans-serif" }}
             initial={{ opacity: 0 }} animate={{ opacity: 0.4 }} transition={{ delay: 0.6 }}
           >
-            © 2025 TimeFlow. All rights reserved.
+            © 2025 TimeTrakr. All rights reserved.
           </motion.p>
         </div>
       </div>

@@ -242,7 +242,7 @@ export default function Login() {
               className="text-xl font-bold tracking-tight"
               style={{ fontFamily: "'Syne', sans-serif", color: "hsl(38,25%,95%)" }}
             >
-              TimeFlow
+              TimeTrakr
             </span>
           </div>
 
@@ -351,7 +351,7 @@ export default function Login() {
               className="text-lg font-bold"
               style={{ fontFamily: "'Syne', sans-serif", color: "hsl(228,25%,12%)" }}
             >
-              TimeFlow
+              TimeTrakr
             </span>
           </motion.div>
 
@@ -528,6 +528,17 @@ export default function Login() {
               </motion.div>
             </motion.div>
 
+            {/* Forgot password */}
+            <div className="flex justify-end -mt-1">
+              <span
+                className="text-xs cursor-pointer hover:underline"
+                style={{ color: "hsl(38,92%,45%)", fontFamily: "'Manrope', sans-serif" }}
+                onClick={() => toast({ title: "Password reset", description: "Use Google or GitHub sign-in, or contact support to reset your password." })}
+              >
+                Forgot password?
+              </span>
+            </div>
+
             {/* Submit */}
             <motion.div
               className="pt-2"
@@ -622,7 +633,7 @@ export default function Login() {
             animate={{ opacity: 0.4 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
-            © 2025 TimeFlow. All rights reserved.
+            © 2025 TimeTrakr. All rights reserved.
           </motion.p>
         </div>
       </div>
