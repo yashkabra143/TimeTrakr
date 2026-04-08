@@ -4,18 +4,89 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+  <!-- ── Primary SEO ─────────────────────────────────────────────── -->
+  <title>TimeTrakr — Time Tracking &amp; Tax Calculator for Indian Freelancers</title>
+  <meta name="description" content="Track USD earnings, auto-convert to INR, and calculate TDS, GST &amp; Advance Tax automatically. Free time tracking app built for Indian freelancers." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://timetrakr.app/" />
+  <meta name="theme-color" content="#F59E0B" />
+  <meta name="keywords" content="time tracking Indian freelancers, USD INR earnings tracker, advance tax calculator freelancer, TDS GST tracker India, freelancer billing software India" />
+
+  <!-- ── Open Graph ──────────────────────────────────────────────── -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TimeTrakr" />
+  <meta property="og:title" content="TimeTrakr — Time Tracking &amp; Tax Calculator for Indian Freelancers" />
+  <meta property="og:description" content="Track USD earnings, auto-convert to INR, and calculate TDS, GST &amp; Advance Tax automatically. Free time tracking app built for Indian freelancers." />
+  <meta property="og:url" content="https://timetrakr.app/" />
+  <meta property="og:image" content="https://timetrakr.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="TimeTrakr — time tracking and tax tools for Indian freelancers" />
+
+  <!-- ── Twitter Card ────────────────────────────────────────────── -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TimeTrakr — Time Tracking &amp; Tax Calculator for Indian Freelancers" />
+  <meta name="twitter:description" content="Track USD earnings, auto-convert to INR, and calculate TDS, GST &amp; Advance Tax automatically. Free time tracking app built for Indian freelancers." />
+  <meta name="twitter:image" content="https://timetrakr.app/og-image.png" />
+
+  <!-- ── JSON-LD Structured Data ────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://timetrakr.app/#website",
+        "name": "TimeTrakr",
+        "url": "https://timetrakr.app/",
+        "description": "Time tracking and tax calculator for Indian freelancers earning in USD",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://timetrakr.app/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://timetrakr.app/#app",
+        "name": "TimeTrakr",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "offers": [
+          {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR",
+            "name": "Free Plan"
+          },
+          {
+            "@type": "Offer",
+            "price": "349",
+            "priceCurrency": "INR",
+            "name": "Pro Plan",
+            "billingIncrement": "P1M"
+          }
+        ],
+        "description": "Complete earnings tracker for Indian freelancers — time tracking, USD to INR conversion, TDS, GST, and Advance Tax automation.",
+        "featureList": [
+          "Time tracking with USD/INR conversion",
+          "TDS Section 194J tracking",
+          "GST 18% calculation",
+          "Advance Tax quarterly reminders",
+          "CA-ready PDF export"
+        ],
+        "url": "https://timetrakr.app/"
+      }
+    ]
+  }
+  </script>
+
+  <!-- ── CSP ────────────────────────────────────────────────────── -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://lottie.host https://unpkg.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://lottie.host https://unpkg.com https://fonts.googleapis.com https://api.razorpay.com https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; child-src https://api.razorpay.com https://checkout.razorpay.com; worker-src 'self' blob:; wasm-src 'self' blob: https://unpkg.com;">
 
-  <meta property="og:title" content="TimeFlow - Professional Time Tracking" />
-  <meta property="og:description"
-    content="Modern time tracking for freelancers with multi-project support, currency conversion, and earnings analytics." />
-  <meta property="og:type" content="website" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="TimeFlow - Professional Time Tracking" />
-  <meta name="twitter:description"
-    content="Modern time tracking for freelancers with multi-project support, currency conversion, and earnings analytics." />
-
+  <!-- ── Favicon & Fonts ─────────────────────────────────────────── -->
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

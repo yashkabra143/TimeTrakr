@@ -66,9 +66,14 @@ function App() {
           {isAuthenticated ? <Redirect to="/" /> : <Register />}
         </Route>
 
-        {/* "/" — landing for guests, dashboard for authenticated users */}
+        {/* "/" — always landing page */}
         <Route path="/">
-          {isAuthenticated ? <ProtectedRoute component={Dashboard} /> : <LandingPage />}
+          {isAuthenticated ? <Redirect to="/dashboard" /> : <LandingPage />}
+        </Route>
+
+        {/* App routes — require auth */}
+        <Route path="/dashboard">
+          <ProtectedRoute component={Dashboard} />
         </Route>
         <Route path="/quick-entry">
           <ProtectedRoute component={QuickEntry} />

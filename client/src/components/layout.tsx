@@ -31,7 +31,7 @@ import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { pageVariants } from "@/lib/animations";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Quick Entry", href: "/quick-entry", icon: Zap },
   { label: "Weekly", href: "/weekly", icon: Calendar },
   { label: "History", href: "/history", icon: History },
@@ -92,7 +92,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="relative flex items-center h-16 px-4 md:px-8 max-w-7xl mx-auto w-full">
           {/* Brand */}
-          <Link href="/">
+          <Link href="/dashboard">
             <div className="flex items-center gap-3 shrink-0 cursor-pointer select-none">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/30">
                 <Timer className="w-4 h-4 text-primary-foreground" strokeWidth={2.5} />

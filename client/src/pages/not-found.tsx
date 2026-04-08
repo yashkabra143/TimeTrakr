@@ -79,7 +79,7 @@ export default function NotFound() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
         >
-          <Link href="/">
+          <Link href="/dashboard">
             <motion.button
               whileHover={{ scale: 1.04, boxShadow: "0 6px 24px hsl(38,92%,50%,0.35)" }}
               whileTap={{ scale: 0.97 }}

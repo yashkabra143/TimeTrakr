@@ -57,7 +57,7 @@ export default function Register() {
       const data = await response.json();
       toast({ title: "Account created!", description: "Welcome to TimeTrakr." });
       login(data.user);
-      navigate("/");
+      navigate("/dashboard");
     } catch {
       toast({ title: "Error", description: "Failed to register. Please try again.", variant: "destructive" });
     } finally {

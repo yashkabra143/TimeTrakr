@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject, useCurrentUser, useUpdateUser, useSendTestReminder, useIsPro } from "@/lib/hooks";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { motion } from "framer-motion";
 import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon, Bell } from "lucide-react";
@@ -205,6 +205,9 @@ export default function Settings() {
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; rate: number; color: string; type: "hourly" | "fixed" } | null>(null);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [lastRateUpdated, setLastRateUpdated] = useState<Date | null>(null);
+  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
+  const autoRateRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const newProjectForm = useForm({ resolver: zodResolver(newProjectSchema), defaultValues: { name: "", rate: 0, color: PROJECT_COLORS[0], type: "hourly" as "hourly" | "fixed" } });
   const projectForm = useForm({ resolver: zodResolver(projectSchema), defaultValues: { projects } });
@@ -254,7 +257,7 @@ export default function Settings() {
     toast({ title: "Currency Updated", description: `Rate set to ₹${data.usdToInr}` });
   }
 
-  async function fetchLiveExchangeRate() {
+  async function fetchLiveExchangeRate(silent = false) {
     setIsFetchingRate(true);
     try {
       const res = await fetch("/api/exchange-rate/live");
@@ -266,13 +269,35 @@ export default function Settings() {
       }
       await updateCurrency.mutateAsync({ usdToInr: rate });
       currencyForm.setValue("usdToInr", rate);
-      toast({ title: "Rate Updated", description: `Live rate: ₹${rate.toFixed(2)}` });
+      setLastRateUpdated(new Date());
+      setSecondsSinceUpdate(0);
+      if (!silent) toast({ title: "Rate Updated", description: `Live rate: ₹${rate.toFixed(2)}` });
     } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to fetch live rate.", variant: "destructive" });
+      if (!silent) toast({ title: "Error", description: e.message || "Failed to fetch live rate.", variant: "destructive" });
     } finally {
       setIsFetchingRate(false);
     }
   }
+
+  // Auto-poll live rate every 60s when on Financials tab
+  useEffect(() => {
+    if (tab !== "financials") {
+      if (autoRateRef.current) clearInterval(autoRateRef.current);
+      return;
+    }
+    fetchLiveExchangeRate(true);
+    autoRateRef.current = setInterval(() => fetchLiveExchangeRate(true), 60_000);
+    return () => { if (autoRateRef.current) clearInterval(autoRateRef.current); };
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tick the "X sec ago" counter every second
+  useEffect(() => {
+    if (!lastRateUpdated) return;
+    const tick = setInterval(() => {
+      setSecondsSinceUpdate(Math.floor((Date.now() - lastRateUpdated.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [lastRateUpdated]);
 
   const handleExport = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ projects, deductions, currency, entries }));
@@ -590,7 +615,7 @@ export default function Settings() {
           </SectionCard>
 
           {/* Currency */}
-          <SectionCard title="Currency Conversion" description="Set the USD to INR exchange rate.">
+          <SectionCard title="Currency Conversion" description="Live USD → INR rate, auto-refreshed every minute.">
             <Form {...currencyForm}>
               <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-5">
                 {/* Rate display */}
@@ -602,6 +627,12 @@ export default function Settings() {
                   <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "'DM Mono', monospace" }}>
                     1 USD = {currency?.usdToInr || 0} INR
                   </p>
+                  {lastRateUpdated && (
+                    <p className="text-[11px] mt-2 flex items-center justify-center gap-1" style={{ color: "hsl(38,92%,50%)", fontFamily: "'DM Mono', monospace" }}>
+                      <RefreshCw className="w-3 h-3" />
+                      Updated {secondsSinceUpdate < 5 ? "just now" : `${secondsSinceUpdate}s ago`} · auto-refreshes every 60s
+                    </p>
+                  )}
                 </div>
 
                 <FormField control={currencyForm.control} name="usdToInr" render={({ field }) => (
@@ -619,13 +650,13 @@ export default function Settings() {
                 )} />
 
                 <div className="flex gap-2">
-                  <motion.button type="button" onClick={fetchLiveExchangeRate} disabled={isFetchingRate}
+                  <motion.button type="button" onClick={() => fetchLiveExchangeRate(false)} disabled={isFetchingRate}
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     data-testid="button-fetch-rate"
                     className="flex-1 h-10 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-border hover:bg-muted transition-colors"
                     style={{ fontFamily: "'Manrope', sans-serif" }}>
                     <RefreshCw className={cn("w-3.5 h-3.5", isFetchingRate && "animate-spin")} />
-                    {isFetchingRate ? "Fetching..." : "Fetch Live Rate"}
+                    {isFetchingRate ? "Fetching..." : "Refresh Now"}
                   </motion.button>
                   <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     data-testid="button-save-currency"

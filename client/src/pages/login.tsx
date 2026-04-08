@@ -181,7 +181,7 @@ export default function Login() {
       const data = await response.json();
       toast({ title: "Welcome back", description: "Signed in successfully." });
       login(data.user);
-      navigate("/");
+      navigate("/dashboard");
     } catch {
       toast({
         title: "Error",

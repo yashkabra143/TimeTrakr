@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://timetrakr.app/sitemap.xml

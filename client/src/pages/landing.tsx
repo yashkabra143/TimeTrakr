@@ -301,7 +301,7 @@ function HeroSection() {
 
           {/* Subtitle */}
           <motion.p variants={heroItem} className="max-w-2xl text-lg md:text-xl text-gray-400 leading-relaxed">
-            The complete earnings tracker for Indian freelancers — handles{" "}
+            The complete <strong className="text-white font-semibold">time tracking app for Indian freelancers</strong> — handles{" "}
             <span className="text-white font-semibold">USD ↔ INR</span>,{" "}
             <span className="text-white font-semibold">Advance Tax</span>,{" "}
             <span className="text-white font-semibold">GST</span>, and{" "}
@@ -312,9 +312,10 @@ function HeroSection() {
           <motion.div variants={heroItem} className="flex flex-col sm:flex-row items-center gap-4">
             <Link
               href="/register"
+              aria-label="Start tracking time for free — no credit card required"
               className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold px-8 py-4 text-base rounded-full shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/40 transition-all"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
               Start for Free
             </Link>
             <a
@@ -401,7 +402,7 @@ function FeaturesSection() {
               whileHover={{ y: -4 }}
             >
               <div className={cn("mb-4 inline-flex items-center justify-center rounded-lg p-3 transition-transform duration-300 group-hover:scale-110", f.iconBg)}>
-                <div className={cn("size-6", f.iconColor)}>{f.icon}</div>
+                <div className={cn("size-6", f.iconColor)} aria-hidden="true">{f.icon}</div>
               </div>
               <h3 className="mb-2 text-xl font-bold text-white">{f.title}</h3>
               <p className="text-sm text-gray-400 leading-relaxed">{f.description}</p>
@@ -421,7 +422,7 @@ function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
 
   return (
-    <div id="pricing" className="relative min-h-fit w-full bg-[#09090b] text-white overflow-hidden py-24 px-4" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <section id="pricing" className="relative min-h-fit w-full bg-[#09090b] text-white overflow-hidden py-24 px-4" style={{ fontFamily: "'Montserrat', sans-serif" }}>
       <div className="absolute inset-0">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-amber-500/8 rounded-full blur-[120px]" />
       </div>
@@ -508,7 +509,7 @@ function PricingSection() {
         </div>
         <p className="text-center text-zinc-500 text-xs mt-6">Cancel anytime. Access continues until end of billing period.</p>
       </div>
-    </div>
+    </section>
   );
 }
 
