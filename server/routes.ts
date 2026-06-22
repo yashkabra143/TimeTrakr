@@ -14,10 +14,45 @@ import { minutesToHoursDecimal, parseTimeInput } from "../shared/time.js";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 
 const scryptAsync = promisify(scrypt);
 
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+// Max data rows accepted in a single CSV import (DoS guard).
+const MAX_CSV_ROWS = 5000;
+
+// ── Rate limiters ───────────────────────────────────────────────────────────
+// NOTE: the default store is in-memory (per-instance). On serverless this
+// limits each warm instance independently; for hard guarantees across
+// instances, back this with a shared store (Redis/Postgres) later.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                  // 10 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again in a few minutes." },
+});
+
+// Looser limit for general authenticated API traffic.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please slow down." },
+});
+
+// ── Validation helpers ────────────────────────────────────────────────────
+const emailSchema = z.string().email().max(254);
+// Password policy: min 8 chars, at least one letter and one number.
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(200, "Password is too long")
+  .regex(/[A-Za-z]/, "Password must contain a letter")
+  .regex(/[0-9]/, "Password must contain a number");
 
 // ── Auth middleware ───────────────────────────────────────────────────────
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -57,19 +92,31 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     res.json({ status: "pong", timestamp: Date.now() });
   });
 
+  // General API rate limit (skips the ping healthcheck above).
+  app.use("/api/", apiLimiter);
+
   // ── Register ─────────────────────────────────────────────────────────────
-  app.post("/api/register", async (req, res) => {
+  app.post("/api/register", authLimiter, async (req, res) => {
     try {
       const { username, password, email } = req.body || {};
 
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
-      if (username.length < 3) {
-        return res.status(400).json({ message: "Username must be at least 3 characters" });
+      if (typeof username !== "string" || username.length < 3 || username.length > 50) {
+        return res.status(400).json({ message: "Username must be between 3 and 50 characters" });
       }
-      if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+
+      const passwordCheck = passwordSchema.safeParse(password);
+      if (!passwordCheck.success) {
+        return res.status(400).json({ message: passwordCheck.error.errors[0]?.message ?? "Invalid password" });
+      }
+
+      if (email != null && email !== "") {
+        const emailCheck = emailSchema.safeParse(email);
+        if (!emailCheck.success) {
+          return res.status(400).json({ message: "Invalid email address" });
+        }
       }
 
       const existing = await storage.getUser(username);
@@ -125,8 +172,17 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      const hashedPassword = (await scryptAsync(password, user.salt!, 64)) as Buffer;
-      if (!timingSafeEqual(hashedPassword, Buffer.from(user.password, "hex"))) {
+      // OAuth-only accounts have no local password — reject cleanly (not a 500).
+      if (!user.salt || !user.password) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      const hashedPassword = (await scryptAsync(password, user.salt, 64)) as Buffer;
+      const storedPassword = Buffer.from(user.password, "hex");
+      if (
+        hashedPassword.length !== storedPassword.length ||
+        !timingSafeEqual(hashedPassword, storedPassword)
+      ) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
@@ -154,8 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   };
 
-  app.post("/api/login", loginHandler);
-  app.post("/login", loginHandler);
+  app.post("/api/login", authLimiter, loginHandler);
+  app.post("/login", authLimiter, loginHandler);
 
   // ── Me (session check) ────────────────────────────────────────────────────
   app.get("/api/me", async (req, res) => {
@@ -200,22 +256,42 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     process.env.APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 5000}`);
 
+  // Generate + persist an anti-CSRF state token, then run the callback.
+  const issueOAuthState = (req: Request): string => {
+    const state = randomBytes(16).toString("hex");
+    req.session.oauthState = state;
+    return state;
+  };
+  // Validate the returned state against the session, then clear it (one-time use).
+  const verifyOAuthState = (req: Request): boolean => {
+    const expected = req.session.oauthState;
+    const actual = req.query.state as string | undefined;
+    req.session.oauthState = undefined;
+    return Boolean(expected) && Boolean(actual) && expected === actual;
+  };
+
   // ── Google OAuth ──────────────────────────────────────────────────────────
   app.get("/auth/google", (req, res) => {
     if (!process.env.GOOGLE_CLIENT_ID) {
       return res.status(503).json({ message: "Google OAuth not configured" });
     }
-    const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      redirect_uri: `${getAppUrl()}/auth/google/callback`,
-      response_type: "code",
-      scope: "openid email profile",
+    const state = issueOAuthState(req);
+    // Persist the state to the session store before redirecting.
+    req.session.save(() => {
+      const params = new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        redirect_uri: `${getAppUrl()}/auth/google/callback`,
+        response_type: "code",
+        scope: "openid email profile",
+        state,
+      });
+      res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
     });
-    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
 
   app.get("/auth/google/callback", async (req, res) => {
     try {
+      if (!verifyOAuthState(req)) return res.redirect("/login?error=oauth_state");
       const code = req.query.code as string;
       if (!code) return res.redirect("/login?error=oauth_cancelled");
 
@@ -268,16 +344,21 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     if (!process.env.GITHUB_CLIENT_ID) {
       return res.status(503).json({ message: "GitHub OAuth not configured" });
     }
-    const params = new URLSearchParams({
-      client_id: process.env.GITHUB_CLIENT_ID,
-      redirect_uri: `${getAppUrl()}/auth/github/callback`,
-      scope: "read:user user:email",
+    const state = issueOAuthState(req);
+    req.session.save(() => {
+      const params = new URLSearchParams({
+        client_id: process.env.GITHUB_CLIENT_ID!,
+        redirect_uri: `${getAppUrl()}/auth/github/callback`,
+        scope: "read:user user:email",
+        state,
+      });
+      res.redirect(`https://github.com/login/oauth/authorize?${params}`);
     });
-    res.redirect(`https://github.com/login/oauth/authorize?${params}`);
   });
 
   app.get("/auth/github/callback", async (req, res) => {
     try {
+      if (!verifyOAuthState(req)) return res.redirect("/login?error=oauth_state");
       const code = req.query.code as string;
       if (!code) return res.redirect("/login?error=oauth_cancelled");
 
@@ -332,13 +413,18 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   });
 
   // ── Change password ───────────────────────────────────────────────────────
-  app.post("/api/change-password", requireAuth, async (req, res) => {
+  app.post("/api/change-password", authLimiter, requireAuth, async (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
       const userId = req.session.userId!;
 
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "All fields are required" });
+      }
+
+      const passwordCheck = passwordSchema.safeParse(newPassword);
+      if (!passwordCheck.success) {
+        return res.status(400).json({ message: passwordCheck.error.errors[0]?.message ?? "Invalid password" });
       }
 
       const user = await storage.getUserById(userId);
@@ -417,6 +503,11 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     try {
       const user = await storage.getUser(req.params.username);
       if (!user) return res.status(404).json({ message: "User not found" });
+      // Prevent user enumeration / PII disclosure: only the owner may read
+      // their own record (email, DOB, etc.) through this endpoint.
+      if (user.id !== req.session.userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
       return res.json({
         user: {
           id: user.id, username: user.username, email: user.email,
@@ -652,7 +743,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
 
-      function parseCSVLine(line: string): string[] {
+      const parseCSVLine = (line: string): string[] => {
         const result: string[] = [];
         let cur = "";
         let inQuotes = false;
@@ -664,9 +755,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
         result.push(cur.trim());
         return result;
-      }
+      };
 
-      function parseDate(str: string): Date | null {
+      const parseDate = (str: string): Date | null => {
         if (!str) return null;
         if (str.includes("/")) {
           const d = new Date(str);
@@ -674,11 +765,13 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
         const d = new Date(str + "T00:00:00");
         return isNaN(d.getTime()) ? null : d;
-      }
+      };
 
       const lines = csv.trim().split(/\r?\n/).filter(l => l.trim());
       if (lines.length < 2)
         return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
+      if (lines.length - 1 > MAX_CSV_ROWS)
+        return res.status(413).json({ message: `Too many rows (max ${MAX_CSV_ROWS}). Split the file and import in batches.` });
 
       const rawHeaders = parseCSVLine(lines[0]);
       const headers = rawHeaders.map(h => h.toLowerCase().replace(/"/g, "").trim());
@@ -984,6 +1077,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       const lines = csv.trim().split(/\r?\n/);
       if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header and at least one row" });
+      if (lines.length - 1 > MAX_CSV_ROWS)
+        return res.status(413).json({ message: `Too many rows (max ${MAX_CSV_ROWS}). Split the file and import in batches.` });
 
       const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
       if (!headers.includes("date") || !headers.includes("amount"))
