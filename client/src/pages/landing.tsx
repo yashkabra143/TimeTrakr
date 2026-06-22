@@ -531,7 +531,7 @@ function Footer() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
-          {[{ label: "Sign In", href: "/login" }, { label: "Register", href: "/register" }, { label: "Features", href: "#features" }, { label: "Pricing", href: "#pricing" }].map((l) => (
+          {[{ label: "Sign In", href: "/login" }, { label: "Register", href: "/register" }, { label: "Features", href: "#features" }, { label: "Pricing", href: "#pricing" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }].map((l) => (
             <a key={l.label} href={l.href} className="text-xs text-zinc-500 hover:text-white transition-colors">{l.label}</a>
           ))}
         </div>

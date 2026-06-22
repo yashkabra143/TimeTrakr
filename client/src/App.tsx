@@ -16,6 +16,8 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import LandingPage from "@/pages/landing";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEffect } from "react";
 
@@ -71,6 +73,10 @@ function App() {
         <Route path="/">
           {isAuthenticated ? <Redirect to="/dashboard" /> : <LandingPage />}
         </Route>
+
+        {/* Public legal pages */}
+        <Route path="/privacy"><Privacy /></Route>
+        <Route path="/terms"><Terms /></Route>
 
         {/* App routes — require auth */}
         <Route path="/dashboard">
