@@ -80,6 +80,7 @@ pnpm-debug.log*
 .mcp.json
 my-video/
 attached_assets/
+Reports/
 
 # ============================
 # AI Tool Configs
