@@ -54,6 +54,44 @@ const passwordSchema = z
   .regex(/[A-Za-z]/, "Password must contain a letter")
   .regex(/[0-9]/, "Password must contain a number");
 
+// ── CSV helpers (shared by the import endpoints) ──────────────────────────
+// RFC-4180-ish parser: respects quoted fields, embedded newlines (Upwork wraps
+// multi-line titles in quotes) and "" escaped quotes. Returns one string[] per
+// logical record — NOT per physical line.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let ci = 0; ci < text.length; ci++) {
+    const ch = text[ci];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[ci + 1] === '"') { cur += '"'; ci++; } // escaped quote
+        else inQuotes = false;
+      } else { cur += ch; }
+    } else if (ch === '"') { inQuotes = true; }
+    else if (ch === ",") { row.push(cur); cur = ""; }
+    else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (ch !== "\r") { cur += ch; }
+  }
+  if (cur !== "" || row.length > 0) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+// Accepts ISO (yyyy-mm-dd, anchored to local midnight to avoid UTC day-shift),
+// slash dates, and Upwork's "Jun 19, 2026" format.
+function parseCsvDate(str: string): Date | null {
+  const s = (str || "").trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(s + "T00:00:00");
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -743,44 +781,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
 
-      // RFC-4180-ish parser: respects quoted fields, embedded newlines (Upwork
-      // wraps multi-line titles in quotes) and "" escaped quotes. Returns one
-      // string[] per logical record — NOT per physical line.
-      const parseCSV = (text: string): string[][] => {
-        const rows: string[][] = [];
-        let row: string[] = [];
-        let cur = "";
-        let inQuotes = false;
-        for (let ci = 0; ci < text.length; ci++) {
-          const ch = text[ci];
-          if (inQuotes) {
-            if (ch === '"') {
-              if (text[ci + 1] === '"') { cur += '"'; ci++; } // escaped quote
-              else inQuotes = false;
-            } else { cur += ch; }
-          } else if (ch === '"') { inQuotes = true; }
-          else if (ch === ",") { row.push(cur); cur = ""; }
-          else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
-          else if (ch !== "\r") { cur += ch; }
-        }
-        if (cur !== "" || row.length > 0) { row.push(cur); rows.push(row); }
-        return rows;
-      };
-
-      const parseDate = (str: string): Date | null => {
-        const s = (str || "").trim();
-        if (!s) return null;
-        // Bare ISO date → anchor to local midnight (avoid UTC day-shift).
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-          const d = new Date(s + "T00:00:00");
-          return isNaN(d.getTime()) ? null : d;
-        }
-        // Everything else: slashes, "Jun 19, 2026", etc. → native parse.
-        const d = new Date(s);
-        return isNaN(d.getTime()) ? null : d;
-      };
-
-      const records = parseCSV(csv.trim());
+      const records = parseCsv(csv.trim());
       if (records.length < 2)
         return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
       if (records.length - 1 > MAX_CSV_ROWS)
@@ -821,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           const isEarning = EARNINGS_TYPES.some(t => txType.includes(t)) || amtVal > 0;
           if (!isEarning) { skipped++; continue; }
 
-          const dateVal = parseDate(row["date"]);
+          const dateVal = parseCsvDate(row["date"]);
           if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
           const descParts = [row["transaction summary"], row["transaction summary details"], row["description 1"], row["description 2"], row["description 3"]].filter(Boolean);
@@ -852,15 +853,21 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
 
         } else {
-          const dateVal = parseDate(row["date"]);
+          const dateVal = parseCsvDate(row["date"]);
           if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
 
           const hoursVal = parseFloat(row["hours"]);
           if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row["hours"]}"` }); continue; }
 
+          // Contract name is ignored for now — Upwork's long contract titles
+          // don't map to project names. Match by name if one happens to align,
+          // otherwise fall back to the first project (same as the Upwork branch).
           const projectName = row["contract"] || row["project"] || "";
-          const project = projects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
-          if (!project) { failed.push({ row: i, reason: `Project not found: "${projectName}"` }); continue; }
+          let project = projectName
+            ? projects.find(p => p.name.toLowerCase() === projectName.toLowerCase())
+            : undefined;
+          if (!project) project = projects[0];
+          if (!project) { failed.push({ row: i, reason: "No projects found — create one first" }); continue; }
 
           const minutes = Math.round(hoursVal * 60);
           const rate = Number(project.rate);
@@ -1086,28 +1093,27 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
 
-      const lines = csv.trim().split(/\r?\n/);
-      if (lines.length < 2) return res.status(400).json({ message: "CSV must have a header and at least one row" });
-      if (lines.length - 1 > MAX_CSV_ROWS)
+      const records = parseCsv(csv.trim());
+      if (records.length < 2) return res.status(400).json({ message: "CSV must have a header and at least one row" });
+      if (records.length - 1 > MAX_CSV_ROWS)
         return res.status(413).json({ message: `Too many rows (max ${MAX_CSV_ROWS}). Split the file and import in batches.` });
 
-      const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
+      const headers = records[0].map(h => h.trim().toLowerCase().replace(/"/g, ""));
       if (!headers.includes("date") || !headers.includes("amount"))
         return res.status(400).json({ message: "Missing required columns: date, amount" });
 
       const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
 
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
+      for (let i = 1; i < records.length; i++) {
+        const values = records[i];
+        if (values.every(v => !v.trim())) continue;
 
-        const values = line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map(v => v.trim().replace(/^"|"$/g, "")) ?? line.split(",").map(v => v.trim());
         const row: Record<string, string> = {};
-        headers.forEach((h, idx) => { row[h] = values[idx]?.trim() ?? ""; });
+        headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").trim(); });
 
-        const dateVal = row.date.includes("/") ? new Date(row.date) : new Date(row.date + "T00:00:00");
-        if (isNaN(dateVal.getTime())) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
+        const dateVal = parseCsvDate(row.date);
+        if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
 
         const amount = parseFloat(row.amount);
         if (isNaN(amount) || amount <= 0) { failed.push({ row: i, reason: `Invalid amount: "${row.amount}"` }); continue; }
@@ -1127,7 +1133,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      res.json({ imported: imported.length, failed, total: lines.length - 1 });
+      res.json({ imported: imported.length, failed, total: records.length - 1 });
     } catch (error) {
       console.error("[WITHDRAWALS IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
