@@ -2,9 +2,9 @@ import { LegalPage, LegalSection } from "@/components/legal-page";
 
 // ── Edit these in one place ──────────────────────────────────────────────
 const LAST_UPDATED = "June 22, 2026";
-const CONTACT_EMAIL = "yash@sun-sirius.com";      // [replace if you set up a dedicated support inbox]
-const LEGAL_ENTITY = "[Legal entity name]";        // e.g. "Sun Sirius Pvt. Ltd."
-const JURISDICTION = "[City], India";              // governing-law venue, e.g. "Bengaluru, India"
+const CONTACT_EMAIL = "yashkabra143@gmail.com";
+const LEGAL_ENTITY = "NirbhayLabs";
+const JURISDICTION = "Indore, Madhya Pradesh, India";
 
 const bullet = "list-disc pl-5 space-y-1.5 marker:text-amber-500";
 
