@@ -6,9 +6,10 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { EASE_SMOOTH } from "@/lib/animations";
 
 // ─── Framer Motion spring config (from 21st.dev features component) ───────────
-const SPRING = { type: "spring", stiffness: 100, damping: 16, mass: 0.75, restDelta: 0.005};
+const SPRING = { type: "spring", stiffness: 100, damping: 16, mass: 0.75, restDelta: 0.005 } as const;
 
 const filterVariants: Variants = {
   hidden: { opacity: 0, y: 20, filter: "blur(10px)" },
@@ -255,7 +256,7 @@ const heroContainer = {
 };
 const heroItem = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.25, 0.4, 0.25, 1] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: EASE_SMOOTH } },
 };
 
 const STAT_PILLS = [

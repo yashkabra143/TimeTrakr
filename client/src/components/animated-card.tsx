@@ -1,9 +1,9 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardProps } from '@/components/ui/card';
+import { motion, type HTMLMotionProps } from 'framer-motion';
+import { Card } from '@/components/ui/card';
 import { cardVariants } from '@/lib/animations';
 
-interface AnimatedCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AnimatedCardProps extends HTMLMotionProps<'div'> {
   index?: number;
   delay?: number;
   children: React.ReactNode;

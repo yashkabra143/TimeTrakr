@@ -11,6 +11,7 @@ import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useU
 import { useEffect, useRef, useState } from "react";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +61,7 @@ const TABS: { value: SectionTab; label: string }[] = [
 
 const fade = (i = 0) => ({
   initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: EASE_OUT_EXPO } },
 });
 
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {

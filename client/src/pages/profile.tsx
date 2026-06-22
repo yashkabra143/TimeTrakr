@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +31,7 @@ type PasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 const fade = (i = 0) => ({
   initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: EASE_OUT_EXPO } },
 });
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {

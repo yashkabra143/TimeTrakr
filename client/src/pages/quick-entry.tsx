@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import { EntryForm } from "@/components/entry-form";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { Zap, Upload } from "lucide-react";
 
 const fade = (i = 0) => ({
   initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.08, ease: EASE_OUT_EXPO } },
 });
 
 export default function QuickEntry() {

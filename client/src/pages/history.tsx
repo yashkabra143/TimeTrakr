@@ -54,6 +54,7 @@ export default function History() {
     const [open, setOpen] = useState(false);
     const [confirmStatusId, setConfirmStatusId] = useState<string | null>(null);
     const [confirmStatusValue, setConfirmStatusValue] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     // Filter & Sort States
     const [statusFilter, setStatusFilter] = useState<"all" | "received" | "pending">("all");
@@ -187,15 +188,19 @@ export default function History() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this withdrawal?")) return;
+    const handleDelete = (id: string) => {
+        setConfirmDeleteId(id);
+    };
 
+    const confirmDelete = async () => {
+        if (!confirmDeleteId) return;
         try {
-            await deleteWithdrawal.mutateAsync(id);
+            await deleteWithdrawal.mutateAsync(confirmDeleteId);
             toast({
                 title: "Withdrawal Deleted",
                 description: "The withdrawal record has been removed.",
             });
+            setConfirmDeleteId(null);
         } catch (error) {
             toast({
                 title: "Error",
@@ -903,6 +908,27 @@ export default function History() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={confirmStatusChange}>
                             Confirm
+                        </AlertDialogAction>
+                    </div>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Confirmation Dialog for Delete */}
+            <AlertDialog open={confirmDeleteId !== null} onOpenChange={() => setConfirmDeleteId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Withdrawal</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this withdrawal? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="flex gap-2">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
                         </AlertDialogAction>
                     </div>
                 </AlertDialogContent>

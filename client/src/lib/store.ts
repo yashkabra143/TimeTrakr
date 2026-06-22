@@ -25,6 +25,9 @@ export interface TimeEntry {
   id: string;
   projectId: string;
   minutes: number;
+  // Legacy input field — older callers pass time as H.MM hours; parsed to
+  // `minutes` in addEntry via parseTimeInput. Not persisted as canonical.
+  hours?: string | number;
   inputFormat?: "hm" | "fractional";
   rawInput?: string;
   date: string; // ISO string

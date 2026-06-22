@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import { format, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { TrendingUp, Zap, Target, Clock } from "lucide-react";
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 import { minutesToHoursDecimal } from "@shared/time";
 
 const fade = (i = 0) => ({
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: EASE_OUT_EXPO } },
 });
 
 interface InsightCardProps {
@@ -117,7 +118,7 @@ export function ProductivityInsights() {
           <>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full ring-2 ring-offset-1 ring-offset-card"
-                style={{ background: insights.topProject.color, ringColor: insights.topProject.color }} />
+                style={{ background: insights.topProject.color, "--tw-ring-color": insights.topProject.color } as React.CSSProperties} />
               <span className="font-bold text-sm truncate" style={{ fontFamily: "'Syne', sans-serif" }}>
                 {insights.topProject.name}
               </span>

@@ -1,4 +1,9 @@
-import { Variants } from 'framer-motion';
+import { Variants, type Easing } from 'framer-motion';
+
+// Shared easing curves for entrance animations (typed as bezier tuples so they
+// satisfy framer-motion's Easing type instead of widening to number[]).
+export const EASE_OUT_EXPO: Easing = [0.22, 1, 0.36, 1];
+export const EASE_SMOOTH: Easing = [0.25, 0.4, 0.25, 1];
 
 // Card entrance animations
 export const cardVariants: Variants = {

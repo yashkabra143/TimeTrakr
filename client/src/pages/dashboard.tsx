@@ -1,5 +1,6 @@
 import * as React from "react";
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,7 @@ import { CalendarIcon, X } from "lucide-react";
 // ── Animation variants ───────────────────────────────────────────────────────
 const fade = {
   hidden: { opacity: 0, y: 16 },
-  show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] } }),
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.07, ease: EASE_OUT_EXPO } }),
 };
 
 const RANGES = [
@@ -564,7 +565,7 @@ export default function Dashboard() {
                   {/* Color dot */}
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1 ring-offset-card"
-                    style={{ background: project?.color || "#888", ringColor: project?.color || "#888" }}
+                    style={{ background: project?.color || "#888", "--tw-ring-color": project?.color || "#888" } as React.CSSProperties}
                   />
 
                   {/* Details */}

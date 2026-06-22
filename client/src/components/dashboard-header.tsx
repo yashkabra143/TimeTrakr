@@ -1,13 +1,14 @@
 import { format } from "date-fns";
 import { Clock, TrendingUp, DollarSign, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/animations";
 import { useTimeEntries, useProjects, useCurrencySettings } from "@/lib/hooks";
 import { minutesToHoursDecimal } from "@shared/time";
 import { AnimatedCounter } from "@/components/animated-counter";
 
 const fade = (i = 0) => ({
   initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.08, ease: EASE_OUT_EXPO } },
 });
 
 interface StatTileProps {
