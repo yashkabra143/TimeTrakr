@@ -743,38 +743,50 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       if (!csv || typeof csv !== "string")
         return res.status(400).json({ message: "No CSV content provided" });
 
-      const parseCSVLine = (line: string): string[] => {
-        const result: string[] = [];
+      // RFC-4180-ish parser: respects quoted fields, embedded newlines (Upwork
+      // wraps multi-line titles in quotes) and "" escaped quotes. Returns one
+      // string[] per logical record — NOT per physical line.
+      const parseCSV = (text: string): string[][] => {
+        const rows: string[][] = [];
+        let row: string[] = [];
         let cur = "";
         let inQuotes = false;
-        for (let ci = 0; ci < line.length; ci++) {
-          const ch = line[ci];
-          if (ch === '"') { inQuotes = !inQuotes; }
-          else if (ch === "," && !inQuotes) { result.push(cur.trim()); cur = ""; }
-          else { cur += ch; }
+        for (let ci = 0; ci < text.length; ci++) {
+          const ch = text[ci];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (text[ci + 1] === '"') { cur += '"'; ci++; } // escaped quote
+              else inQuotes = false;
+            } else { cur += ch; }
+          } else if (ch === '"') { inQuotes = true; }
+          else if (ch === ",") { row.push(cur); cur = ""; }
+          else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+          else if (ch !== "\r") { cur += ch; }
         }
-        result.push(cur.trim());
-        return result;
+        if (cur !== "" || row.length > 0) { row.push(cur); rows.push(row); }
+        return rows;
       };
 
       const parseDate = (str: string): Date | null => {
-        if (!str) return null;
-        if (str.includes("/")) {
-          const d = new Date(str);
+        const s = (str || "").trim();
+        if (!s) return null;
+        // Bare ISO date → anchor to local midnight (avoid UTC day-shift).
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+          const d = new Date(s + "T00:00:00");
           return isNaN(d.getTime()) ? null : d;
         }
-        const d = new Date(str + "T00:00:00");
+        // Everything else: slashes, "Jun 19, 2026", etc. → native parse.
+        const d = new Date(s);
         return isNaN(d.getTime()) ? null : d;
       };
 
-      const lines = csv.trim().split(/\r?\n/).filter(l => l.trim());
-      if (lines.length < 2)
+      const records = parseCSV(csv.trim());
+      if (records.length < 2)
         return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
-      if (lines.length - 1 > MAX_CSV_ROWS)
+      if (records.length - 1 > MAX_CSV_ROWS)
         return res.status(413).json({ message: `Too many rows (max ${MAX_CSV_ROWS}). Split the file and import in batches.` });
 
-      const rawHeaders = parseCSVLine(lines[0]);
-      const headers = rawHeaders.map(h => h.toLowerCase().replace(/"/g, "").trim());
+      const headers = records[0].map(h => h.toLowerCase().replace(/"/g, "").trim());
       const isUpwork = headers.includes("transaction id") || headers.includes("transaction type") || headers.includes("amount $");
 
       const [projects, deductions, currency] = await Promise.all([
@@ -793,13 +805,12 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         "client funded milestone", "milestone payment", "hourly payment",
       ];
 
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
+      for (let i = 1; i < records.length; i++) {
+        const values = records[i];
+        if (values.every(v => !v.trim())) continue;
 
-        const values = parseCSVLine(line);
         const row: Record<string, string> = {};
-        headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").replace(/^"|"$/g, "").trim(); });
+        headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").trim(); });
 
         if (isUpwork) {
           const txType = (row["transaction type"] || "").toLowerCase();
@@ -873,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      res.json({ imported: imported.length, failed, skipped, total: lines.length - 1 });
+      res.json({ imported: imported.length, failed, skipped, total: records.length - 1 });
     } catch (error) {
       console.error("[ENTRIES IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
