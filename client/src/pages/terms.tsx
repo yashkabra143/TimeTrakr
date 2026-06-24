@@ -1,12 +1,5 @@
 import { LegalPage, LegalSection } from "@/components/legal-page";
-
-// ── Edit these in one place ──────────────────────────────────────────────
-const LAST_UPDATED = "June 22, 2026";
-const CONTACT_EMAIL = "yashkabra143@gmail.com";
-const LEGAL_ENTITY = "NirbhayLabs";
-const JURISDICTION = "Indore, Madhya Pradesh, India";
-
-const bullet = "list-disc pl-5 space-y-1.5 marker:text-amber-500";
+import { LAST_UPDATED, CONTACT_EMAIL, LEGAL_ENTITY, JURISDICTION, bullet } from "@/lib/legalConstants";
 
 export default function Terms() {
   return (
@@ -58,7 +51,7 @@ export default function Terms() {
       <LegalSection heading="5. Subscriptions &amp; payments">
         <p>
           Some features may require a paid subscription. If paid plans are offered, pricing, billing cycle, and refund
-          terms will be presented at checkout and processed by our payment provider <strong>[Razorpay]</strong>. Taxes
+          terms will be presented at checkout and processed by our payment provider <strong>Razorpay</strong>. Taxes
           may apply. You can cancel as described in your account settings; cancellation stops future renewals.
         </p>
       </LegalSection>

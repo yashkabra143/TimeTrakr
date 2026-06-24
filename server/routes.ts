@@ -54,6 +54,19 @@ const passwordSchema = z
   .regex(/[A-Za-z]/, "Password must contain a letter")
   .regex(/[0-9]/, "Password must contain a number");
 
+const updateUserSchema = z.object({
+  username: z.string().min(3).max(50).optional(),
+  email: z.string().email().max(254).optional().nullable(),
+  fullName: z.string().max(100).optional().nullable(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // Allow https URLs (OAuth avatars) or data:image/... base64 (local uploads) or empty string
+  profilePicture: z.string().refine(
+    v => v === "" || v === null || v.startsWith("https://") || /^data:image\/(png|jpeg|jpg|gif|webp);base64,/.test(v),
+    { message: "profilePicture must be an https URL or a base64 image data URI" }
+  ).optional().nullable(),
+  reminderEnabled: z.boolean().optional(),
+});
+
 // ── CSV helpers (shared by the import endpoints) ──────────────────────────
 // RFC-4180-ish parser: respects quoted fields, embedded newlines (Upwork wraps
 // multi-line titles in quotes) and "" escaped quotes. Returns one string[] per
@@ -492,7 +505,12 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.patch("/api/user", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { username, email, fullName, dateOfBirth, profilePicture, reminderEnabled } = req.body;
+
+      const parsed = updateUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid input" });
+      }
+      const { username, email, fullName, dateOfBirth, profilePicture, reminderEnabled } = parsed.data;
 
       // Gate reminder toggle behind Pro subscription
       if (reminderEnabled === true) {
@@ -918,7 +936,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       return res.json({ sent: ["email"] });
     } catch (error: any) {
       console.error("[REMINDER TEST] Error:", error);
-      res.status(500).json({ message: error.message || "Failed to send test email" });
+      res.status(500).json({ message: "Failed to send test email" });
     }
   });
 
@@ -1065,6 +1083,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     try {
       const { paymentStatus } = req.body;
       if (!paymentStatus) return res.status(400).json({ message: "Payment status is required" });
+      if (!["pending", "received"].includes(paymentStatus)) {
+        return res.status(400).json({ message: "paymentStatus must be 'pending' or 'received'" });
+      }
 
       const withdrawal = await storage.updateWithdrawalStatus(req.params.id, paymentStatus, req.session.userId!);
       if (!withdrawal) return res.status(404).json({ message: "Withdrawal not found" });

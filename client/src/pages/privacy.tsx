@@ -1,12 +1,5 @@
 import { LegalPage, LegalSection } from "@/components/legal-page";
-
-// ── Edit these in one place ──────────────────────────────────────────────
-const LAST_UPDATED = "June 22, 2026";
-const CONTACT_EMAIL = "yashkabra143@gmail.com";
-const LEGAL_ENTITY = "NirbhayLabs";
-const JURISDICTION = "Indore, Madhya Pradesh, India";
-
-const bullet = "list-disc pl-5 space-y-1.5 marker:text-amber-500";
+import { LAST_UPDATED, CONTACT_EMAIL, LEGAL_ENTITY, JURISDICTION, bullet } from "@/lib/legalConstants";
 
 export default function Privacy() {
   return (
@@ -48,7 +41,7 @@ export default function Privacy() {
           <li><strong>Neon</strong> — managed PostgreSQL database hosting.</li>
           <li><strong>Vercel</strong> — application hosting and aggregate analytics.</li>
           <li><strong>SendGrid</strong> — delivery of reminder emails (only if you enable them).</li>
-          <li><strong>[Razorpay]</strong> — payment processing, only if and when paid plans are enabled.</li>
+          <li><strong>Razorpay</strong> — payment processing, only if and when paid plans are enabled.</li>
         </ul>
       </LegalSection>
 
