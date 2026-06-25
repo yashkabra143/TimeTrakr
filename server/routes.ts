@@ -1053,6 +1053,17 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
+  // ── Balance ───────────────────────────────────────────────────────────────
+  app.get("/api/balance", requireAuth, async (req, res) => {
+    try {
+      const balance = await storage.getBalance(req.session.userId!);
+      res.json(balance);
+    } catch (error) {
+      console.error("[BALANCE GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ── Withdrawals ───────────────────────────────────────────────────────────
   app.get("/api/withdrawals", requireAuth, async (req, res) => {
     try {

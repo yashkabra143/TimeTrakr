@@ -24,7 +24,7 @@ import {
   type WebhookEvent,
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, and, isNull, isNotNull } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 
 export interface IStorage {
@@ -92,6 +92,9 @@ export interface IStorage {
   getWebhookEvent(eventId: string): Promise<WebhookEvent | undefined>;
   createWebhookEvent(event: { eventId: string; eventType: string; payload: string; processed: boolean }): Promise<WebhookEvent>;
   getUserByRazorpaySubId(subId: string): Promise<User | undefined>;
+
+  // Balance
+  getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -471,6 +474,22 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.razorpaySubId, subId));
     return user ?? undefined;
+  }
+
+  // ── Balance ───────────────────────────────────────────────────────────────
+
+  async getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }> {
+    const [[earningsRow], [withdrawnRow]] = await Promise.all([
+      db.select({ total: sql<number>`coalesce(sum(${timeEntries.netUsd}), 0)` })
+        .from(timeEntries)
+        .where(eq(timeEntries.userId, userId)),
+      db.select({ total: sql<number>`coalesce(sum(${withdrawals.netEarnings}), 0)` })
+        .from(withdrawals)
+        .where(eq(withdrawals.userId, userId)),
+    ]);
+    const totalEarnings  = Number(earningsRow.total);
+    const totalWithdrawn = Number(withdrawnRow.total);
+    return { totalEarnings, totalWithdrawn, availableBalance: Math.max(0, totalEarnings - totalWithdrawn) };
   }
 }
 

@@ -94,6 +94,13 @@ export async function deleteTimeEntry(id: string): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete time entry");
 }
 
+// Balance
+export async function getBalance(): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }> {
+  const response = await fetch(`${API_URL}/balance`);
+  if (!response.ok) throw new Error("Failed to fetch balance");
+  return response.json();
+}
+
 // Withdrawals
 export async function getWithdrawals(): Promise<Withdrawal[]> {
   const response = await fetch(`${API_URL}/withdrawals`);
