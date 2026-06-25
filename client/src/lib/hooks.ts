@@ -146,6 +146,24 @@ export function useDeleteTimeEntry() {
   });
 }
 
+// Balance
+export function useBalance() {
+  return useQuery({
+    queryKey: ["balance"],
+    queryFn: api.getBalance,
+  });
+}
+
+export function useSetAvailableFunds() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (amount: number) => api.setAvailableFunds(amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["balance"] });
+    },
+  });
+}
+
 // Withdrawals
 export function useWithdrawals() {
   return useQuery({

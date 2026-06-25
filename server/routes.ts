@@ -1064,6 +1064,20 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     }
   });
 
+  app.patch("/api/balance/available-funds", requireAuth, async (req, res) => {
+    try {
+      const { amount } = req.body;
+      if (typeof amount !== "number" || amount < 0) {
+        return res.status(400).json({ message: "amount must be a non-negative number" });
+      }
+      await storage.setAvailableFunds(req.session.userId!, amount);
+      res.json({ availableFunds: amount });
+    } catch (error) {
+      console.error("[BALANCE AVAILABLE-FUNDS PATCH] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ── Withdrawals ───────────────────────────────────────────────────────────
   app.get("/api/withdrawals", requireAuth, async (req, res) => {
     try {

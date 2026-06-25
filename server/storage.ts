@@ -94,7 +94,8 @@ export interface IStorage {
   getUserByRazorpaySubId(subId: string): Promise<User | undefined>;
 
   // Balance
-  getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }>;
+  getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number; availableFunds: number | null }>;
+  setAvailableFunds(userId: string, amount: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -478,18 +479,27 @@ export class DatabaseStorage implements IStorage {
 
   // ── Balance ───────────────────────────────────────────────────────────────
 
-  async getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }> {
-    const [[earningsRow], [withdrawnRow]] = await Promise.all([
+  async getBalance(userId: string): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number; availableFunds: number | null }> {
+    const [[earningsRow], [withdrawnRow], userRow] = await Promise.all([
       db.select({ total: sql<number>`coalesce(sum(${timeEntries.netUsd}), 0)` })
         .from(timeEntries)
         .where(eq(timeEntries.userId, userId)),
       db.select({ total: sql<number>`coalesce(sum(${withdrawals.netEarnings}), 0)` })
         .from(withdrawals)
         .where(eq(withdrawals.userId, userId)),
+      db.select({ availableFunds: users.availableFunds })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
     ]);
     const totalEarnings  = Number(earningsRow.total);
     const totalWithdrawn = Number(withdrawnRow.total);
-    return { totalEarnings, totalWithdrawn, availableBalance: Math.max(0, totalEarnings - totalWithdrawn) };
+    const availableFunds = userRow[0]?.availableFunds ?? null;
+    return { totalEarnings, totalWithdrawn, availableBalance: Math.max(0, totalEarnings - totalWithdrawn), availableFunds };
+  }
+
+  async setAvailableFunds(userId: string, amount: number): Promise<void> {
+    await db.update(users).set({ availableFunds: amount }).where(eq(users.id, userId));
   }
 }
 

@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   salt: text("salt"),                 // nullable — OAuth users have no salt
   googleId: text("google_id").unique(),
   githubId: text("github_id").unique(),
+  availableFunds: real("available_funds"),
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   planType: text("plan_type").notNull().default("free"),
   planExpiresAt: timestamp("plan_expires_at"),

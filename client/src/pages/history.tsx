@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, isAfter, isBefore, startOfDay, endOfDay, subDays, subMonths, startOfYear } from "date-fns";
-import { useWithdrawals, useCreateWithdrawal, useUpdateWithdrawalStatus, useDeleteWithdrawal, useTimeEntries, useCurrencySettings } from "@/lib/hooks";
+import { useWithdrawals, useCreateWithdrawal, useUpdateWithdrawalStatus, useDeleteWithdrawal, useTimeEntries, useCurrencySettings, useBalance, useSetAvailableFunds } from "@/lib/hooks";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp, Upload, X, SlidersHorizontal } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Calendar as CalendarIcon, Wallet, Download, ArrowUpDown, TrendingUp, Upload, X, SlidersHorizontal, Pencil, Check } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,6 +46,8 @@ export default function History() {
     const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useWithdrawals();
     const { data: timeEntries = [], isLoading: isLoadingEntries } = useTimeEntries();
     const { data: currencySettings } = useCurrencySettings();
+    const { data: balanceData } = useBalance();
+    const setAvailableFunds = useSetAvailableFunds();
 
     const createWithdrawal = useCreateWithdrawal();
     const updateStatus = useUpdateWithdrawalStatus();
@@ -66,6 +68,8 @@ export default function History() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [editingFunds, setEditingFunds] = useState(false);
+    const [fundsInput, setFundsInput] = useState("");
 
     const DATE_PRESETS = [
       { label: "All Time",     value: "all" },
@@ -100,10 +104,19 @@ export default function History() {
       }
     }
 
-    // Calculate Available Balance
+    // Available funds: manually set Upwork balance (server); fall back to client calc
     const totalEarnings = timeEntries.reduce((sum, entry) => sum + (entry.netUsd || 0), 0);
-    const totalWithdrawn = withdrawals.reduce((sum, withdrawal) => sum + (withdrawal.netEarnings || 0), 0);
+    const totalWithdrawn = withdrawals.reduce((sum, w) => sum + (w.netEarnings || 0), 0);
     const availableBalance = Math.max(0, totalEarnings - totalWithdrawn);
+    const availableFunds = balanceData?.availableFunds ?? null;
+
+    async function handleSaveFunds() {
+        const val = parseFloat(fundsInput);
+        if (isNaN(val) || val < 0) return;
+        await setAvailableFunds.mutateAsync(val);
+        setEditingFunds(false);
+        toast({ title: "Available funds updated", description: `Set to $${val.toFixed(2)}` });
+    }
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -121,10 +134,11 @@ export default function History() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            if (values.netEarnings > availableBalance + 0.01) {
+            const withdrawLimit = availableFunds ?? availableBalance;
+            if (values.netEarnings > withdrawLimit + 0.01) {
                 toast({
                     title: "Insufficient Funds",
-                    description: `You can only withdraw up to $${availableBalance.toFixed(2)}`,
+                    description: `You can only withdraw up to $${withdrawLimit.toFixed(2)}`,
                     variant: "destructive",
                 });
                 return;
@@ -365,8 +379,40 @@ export default function History() {
                                 <Wallet className="h-5 w-5" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Available Balance</p>
-                                <p className="text-xl font-bold font-heading text-primary">${availableBalance.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Upwork Available Funds</p>
+                                {editingFunds ? (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                        <span className="text-primary font-bold">$</span>
+                                        <input
+                                            autoFocus
+                                            type="number"
+                                            step="0.01"
+                                            className="w-24 text-lg font-bold font-heading text-primary bg-transparent border-b border-primary outline-none"
+                                            value={fundsInput}
+                                            onChange={e => setFundsInput(e.target.value)}
+                                            onKeyDown={e => { if (e.key === "Enter") handleSaveFunds(); if (e.key === "Escape") setEditingFunds(false); }}
+                                        />
+                                        <button onClick={handleSaveFunds} className="text-primary hover:text-primary/70 ml-1">
+                                            <Check className="h-4 w-4" />
+                                        </button>
+                                        <button onClick={() => setEditingFunds(false)} className="text-muted-foreground hover:text-foreground">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xl font-bold font-heading text-primary">
+                                            {availableFunds !== null ? `$${availableFunds.toFixed(2)}` : `$${availableBalance.toFixed(2)}`}
+                                        </p>
+                                        <button
+                                            onClick={() => { setFundsInput(availableFunds !== null ? availableFunds.toFixed(2) : availableBalance.toFixed(2)); setEditingFunds(true); }}
+                                            className="text-muted-foreground hover:text-primary transition-colors"
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-0.5">Calc: ${availableBalance.toFixed(2)}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -392,7 +438,7 @@ export default function History() {
                             <DialogHeader>
                                 <DialogTitle>Create Withdrawal</DialogTitle>
                                 <DialogDescription>
-                                    Record a new withdrawal. Available: <span className="font-bold text-primary">${availableBalance.toFixed(2)}</span>
+                                    Record a new withdrawal. Available: <span className="font-bold text-primary">${(availableFunds ?? availableBalance).toFixed(2)}</span>
                                 </DialogDescription>
                             </DialogHeader>
                             <Form {...form}>

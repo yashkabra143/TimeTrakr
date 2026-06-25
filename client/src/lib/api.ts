@@ -95,9 +95,19 @@ export async function deleteTimeEntry(id: string): Promise<void> {
 }
 
 // Balance
-export async function getBalance(): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number }> {
+export async function getBalance(): Promise<{ totalEarnings: number; totalWithdrawn: number; availableBalance: number; availableFunds: number | null }> {
   const response = await fetch(`${API_URL}/balance`);
   if (!response.ok) throw new Error("Failed to fetch balance");
+  return response.json();
+}
+
+export async function setAvailableFunds(amount: number): Promise<{ availableFunds: number }> {
+  const response = await fetch(`${API_URL}/balance/available-funds`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount }),
+  });
+  if (!response.ok) throw new Error("Failed to update available funds");
   return response.json();
 }
 
