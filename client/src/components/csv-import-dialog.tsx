@@ -287,7 +287,7 @@ export function CsvImportDialog({ type, trigger }: CsvImportDialogProps) {
               <div className="rounded-xl bg-muted/30 border border-border/60 p-3 text-xs overflow-x-auto whitespace-pre-wrap"
                 style={{ fontFamily: "'DM Mono', monospace", color: "hsl(220,10%,50%)" }}>
                 {isEntries
-                  ? "✅ Upwork report: upload as-is (auto-detected)\n\n✅ Simple format:\ndate, project, hours, description\n1/15/2026, My Project, 2.30, Work done"
+                  ? "✅ Upwork report: upload as-is (auto-detected)\n\n✅ Simple format:\ndate, project, hours, description\n15/1/2026, My Project, 2.30, Work done\n\nDate formats accepted:\n  15/1/2026 · 1/15/2026 · 2026-01-15"
                   : "date, amount, notes, status\n1/31/2026, 250.50, January, received"}
               </div>
 

@@ -92,15 +92,46 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-// Accepts ISO (yyyy-mm-dd, anchored to local midnight to avoid UTC day-shift),
-// slash dates, and Upwork's "Jun 19, 2026" format.
+// Accepts ISO (yyyy-mm-dd), slash dates (M/D/YYYY or D/M/YYYY — auto-detected),
+// dash dates (D-M-YYYY), and Upwork's "Jun 19, 2026" format.
+// ISO is anchored to local midnight to avoid UTC day-shift.
+// For slash/dash ambiguity (e.g. 2/3/2026): if first number > 12 it must be day,
+// otherwise defaults to M/D/YYYY (US, matches the template).
 function parseCsvDate(str: string): Date | null {
   const s = (str || "").trim();
   if (!s) return null;
+
+  // ISO yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const d = new Date(s + "T00:00:00");
     return isNaN(d.getTime()) ? null : d;
   }
+
+  // Slash-separated: M/D/YYYY or D/M/YYYY
+  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashMatch) {
+    const a = Number(slashMatch[1]);
+    const b = Number(slashMatch[2]);
+    const rawYear = Number(slashMatch[3]);
+    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+    const [month, day] = a > 12 ? [b, a] : [a, b]; // D/M if a>12, else M/D
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) || d.getMonth() !== month - 1 ? null : d;
+  }
+
+  // Non-ISO dash: D-M-YYYY or M-D-YYYY
+  const dashMatch = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if (dashMatch) {
+    const a = Number(dashMatch[1]);
+    const b = Number(dashMatch[2]);
+    const rawYear = Number(dashMatch[3]);
+    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+    const [month, day] = a > 12 ? [b, a] : [a, b];
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) || d.getMonth() !== month - 1 ? null : d;
+  }
+
+  // Natural language / Upwork "Jun 19, 2026"
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
