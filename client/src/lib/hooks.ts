@@ -105,6 +105,9 @@ export function useCurrencySettings() {
   return useQuery({
     queryKey: ["currency"],
     queryFn: api.getCurrencySettings,
+    // The server refreshes the live rate (cached 10 min), so re-read it periodically.
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
   });
 }
 

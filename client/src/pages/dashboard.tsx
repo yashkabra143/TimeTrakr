@@ -169,13 +169,16 @@ export default function Dashboard() {
         minutes:    acc.minutes    + (curr.minutes       || 0),
         grossUsd:   acc.grossUsd   + (curr.grossUsd      || 0),
         netUsd:     acc.netUsd     + (curr.netUsd        || 0),
-        netInr:     acc.netInr     + (curr.netInr        || 0),
         deductions: acc.deductions + (curr.deductionTotal || 0),
       }),
-      { minutes: 0, grossUsd: 0, netUsd: 0, netInr: 0, deductions: 0 }
+      { minutes: 0, grossUsd: 0, netUsd: 0, deductions: 0 }
     ),
     [filteredEntries]
   );
+  // INR at the current Upwork rate, so the figure matches the rate shown beside it.
+  // (Each entry still stores the rate from when it was logged, used by History/Tax.)
+  const rate = Number(currency?.usdToInr) || 0;
+  const netInr = summary.netUsd * rate;
 
   const lineChartData = React.useMemo(() => {
     let start = currentInterval.start;
@@ -370,7 +373,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Net (INR)"
-          value={`₹${summary.netInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+          value={`₹${netInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
           sub={`@ ₹${currency?.usdToInr || 0}/$`}
           icon={Wallet}
           accent="bg-emerald-100"
@@ -585,7 +588,7 @@ export default function Dashboard() {
                       {formatMinutesReadable(entry.minutes)}
                     </p>
                     <p className="text-xs text-muted-foreground tabular-nums mt-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>
-                      ${(entry.grossUsd || 0).toFixed(2)} · ₹{(entry.netInr || 0).toFixed(0)}
+                      ${(entry.grossUsd || 0).toFixed(2)} · ₹{((entry.netUsd || 0) * rate).toFixed(0)}
                     </p>
                   </div>
 
