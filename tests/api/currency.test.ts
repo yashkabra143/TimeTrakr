@@ -40,10 +40,15 @@ describe("PATCH /api/currency", () => {
     expect(res.body.usdToInr).toBeCloseTo(87.5);
   });
 
-  it("rate persists — GET returns updated value", async () => {
-    await request.patch("/api/currency").set("Cookie", cookie).send({ usdToInr: 91.0 });
+  it("GET refreshes to the live rate, keeping the stored rate as fallback", async () => {
+    await request.patch("/api/currency").set("Cookie", cookie).send({ usdToInr: 1.23 });
+    const live = await request.get("/api/exchange-rate/live").set("Cookie", cookie);
     const res = await request.get("/api/currency").set("Cookie", cookie);
-    expect(res.body.usdToInr).toBeCloseTo(91.0);
+    if (live.status === 200) {
+      expect(res.body.usdToInr).toBeCloseTo(live.body.rate);
+    } else {
+      expect(res.body.usdToInr).toBeCloseTo(1.23);
+    }
   });
 
   it("400 or 422 — negative rate rejected", async () => {

@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
+import { getLiveUsdInr, refreshUserCurrency } from "./exchange-rate.js";
 import { registerSubscriptionRoutes } from "./subscription-routes.js";
 import {
   insertProjectSchema,
@@ -688,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   // ── Currency ──────────────────────────────────────────────────────────────
   app.get("/api/currency", requireAuth, async (req, res) => {
     try {
-      const currency = await storage.getCurrencySettings(req.session.userId!);
+      const currency = await refreshUserCurrency(req.session.userId!);
       res.json(currency);
     } catch (error) {
       console.error("[CURRENCY GET] Error:", error);
@@ -699,7 +700,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
   app.patch("/api/currency", requireAuth, async (req, res) => {
     try {
       const validated = insertCurrencySettingsSchema.partial().parse(req.body);
-      const currency = await storage.updateCurrencySettings(req.session.userId!, validated);
+      await storage.updateCurrencySettings(req.session.userId!, validated);
+      // Re-derive the rate so a margin change applies immediately.
+      const currency = await refreshUserCurrency(req.session.userId!);
       res.json(currency);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -713,26 +716,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
   // ── Live exchange rate proxy ───────────────────────────────────────────────
   app.get("/api/exchange-rate/live", requireAuth, async (_req, res) => {
-    try {
-      // Try Frankfurter first
-      const r = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR");
-      if (r.ok) {
-        const data = await r.json() as { rates?: { INR?: number } };
-        const rate = data.rates?.INR;
-        if (rate) return res.json({ rate });
-      }
-    } catch { /* fall through to backup */ }
-
-    try {
-      // Backup: ExchangeRate-API (no key required, 1500 req/month free)
-      const r2 = await fetch("https://open.er-api.com/v6/latest/USD");
-      if (r2.ok) {
-        const data = await r2.json() as { rates?: { INR?: number } };
-        const rate = data.rates?.INR;
-        if (rate) return res.json({ rate });
-      }
-    } catch { /* fall through */ }
-
+    const rate = await getLiveUsdInr();
+    if (rate !== null) return res.json({ rate });
     res.status(502).json({ message: "Could not fetch live exchange rate. Try again later." });
   });
 
@@ -766,7 +751,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       const [deductions, currency] = await Promise.all([
         storage.getDeductions(userId),
-        storage.getCurrencySettings(userId),
+        refreshUserCurrency(userId),
       ]);
 
       const rate = Number(project.rate);
@@ -842,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       const [projects, deductions, currency] = await Promise.all([
         storage.getProjects(userId),
         storage.getDeductions(userId),
-        storage.getCurrencySettings(userId),
+        refreshUserCurrency(userId),
       ]);
 
       const exchangeRate = Number(currency.usdToInr) || 0;

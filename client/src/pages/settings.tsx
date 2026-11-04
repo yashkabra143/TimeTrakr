@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useUpdateDeductions, useUpdateCurrencySettings, useTimeEntries, useCreateProject, useDeleteProject, useCurrentUser, useUpdateUser, useSendTestReminder, useIsPro } from "@/lib/hooks";
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { motion } from "framer-motion";
 import { EASE_OUT_EXPO } from "@/lib/animations";
@@ -49,6 +50,7 @@ const deductionSchema = z.object({
 
 const currencySchema = z.object({
   usdToInr: z.coerce.number().min(1),
+  upworkMarginPercent: z.coerce.number().min(0).max(10),
 });
 
 type SectionTab = "general" | "financials" | "data";
@@ -213,11 +215,12 @@ export default function Settings() {
   const newProjectForm = useForm({ resolver: zodResolver(newProjectSchema), defaultValues: { name: "", rate: 0, color: PROJECT_COLORS[0], type: "hourly" as "hourly" | "fixed" } });
   const projectForm = useForm({ resolver: zodResolver(projectSchema), defaultValues: { projects } });
   const deductionForm = useForm({ resolver: zodResolver(deductionSchema), defaultValues: deductions });
-  const currencyForm = useForm({ resolver: zodResolver(currencySchema), defaultValues: { usdToInr: currency?.usdToInr || 84 } });
+  const currencyForm = useForm({ resolver: zodResolver(currencySchema), defaultValues: { usdToInr: currency?.usdToInr || 84, upworkMarginPercent: currency?.upworkMarginPercent ?? 2.2 } });
+  const queryClient = useQueryClient();
 
   useEffect(() => { if (projects.length > 0) projectForm.reset({ projects }); }, [projects]);
   useEffect(() => { if (deductions) deductionForm.reset(deductions); }, [deductions]);
-  useEffect(() => { if (currency) currencyForm.reset({ usdToInr: currency.usdToInr }); }, [currency]);
+  useEffect(() => { if (currency) currencyForm.reset({ usdToInr: currency.usdToInr, upworkMarginPercent: currency.upworkMarginPercent }); }, [currency]);
 
   async function onProjectSubmit(data: any) {
     for (const p of data.projects) {
@@ -254,25 +257,26 @@ export default function Settings() {
   }
 
   async function onCurrencySubmit(data: z.infer<typeof currencySchema>) {
-    await updateCurrency.mutateAsync({ usdToInr: data.usdToInr });
-    toast({ title: "Currency Updated", description: `Rate set to ₹${data.usdToInr}` });
+    const updated = await updateCurrency.mutateAsync({ usdToInr: data.usdToInr, upworkMarginPercent: data.upworkMarginPercent });
+    toast({ title: "Currency Updated", description: `Upwork rate: ₹${updated.usdToInr}` });
   }
 
   async function fetchLiveExchangeRate(silent = false) {
     setIsFetchingRate(true);
     try {
-      const res = await fetch("/api/exchange-rate/live");
+      // The server applies the Upwork margin to the live market rate and saves it.
+      const res = await fetch("/api/currency");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as any).message || "Failed to fetch");
-      const { rate } = data as { rate: unknown };
+      const rate = (data as { usdToInr?: unknown }).usdToInr;
       if (typeof rate !== "number" || !isFinite(rate)) {
         throw new Error("Received an invalid exchange rate from the server.");
       }
-      await updateCurrency.mutateAsync({ usdToInr: rate });
+      queryClient.setQueryData(["currency"], data);
       currencyForm.setValue("usdToInr", rate);
       setLastRateUpdated(new Date());
       setSecondsSinceUpdate(0);
-      if (!silent) toast({ title: "Rate Updated", description: `Live rate: ₹${rate.toFixed(2)}` });
+      if (!silent) toast({ title: "Rate Updated", description: `Upwork rate: ₹${rate.toFixed(4)}` });
     } catch (e: any) {
       if (!silent) toast({ title: "Error", description: e.message || "Failed to fetch live rate.", variant: "destructive" });
     } finally {
@@ -616,12 +620,12 @@ export default function Settings() {
           </SectionCard>
 
           {/* Currency */}
-          <SectionCard title="Currency Conversion" description="Live USD → INR rate, auto-refreshed every minute.">
+          <SectionCard title="Currency Conversion" description="The rate Upwork pays you: live USD → INR market rate minus Upwork's conversion margin.">
             <Form {...currencyForm}>
               <form onSubmit={currencyForm.handleSubmit(onCurrencySubmit)} className="space-y-5">
                 {/* Rate display */}
                 <div className="rounded-xl p-5 text-center" style={{ background: "hsl(38,92%,50%,0.06)", border: "1px solid hsl(38,92%,50%,0.15)" }}>
-                  <p className="text-xs text-muted-foreground mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>Current Rate</p>
+                  <p className="text-xs text-muted-foreground mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>Upwork Rate</p>
                   <p className="text-4xl font-bold text-primary" style={{ fontFamily: "'Syne', sans-serif" }}>
                     ₹{currency?.usdToInr || 0}
                   </p>
@@ -636,16 +640,27 @@ export default function Settings() {
                   )}
                 </div>
 
+                <FormField control={currencyForm.control} name="upworkMarginPercent" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Upwork Conversion Margin (%)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" className="h-10 rounded-xl" {...field} data-testid="input-upwork-margin" />
+                    </FormControl>
+                    <FormDescription className="text-xs">How far below the market rate Upwork converts. Find it from a withdrawal email: 1 − (Upwork rate ÷ market rate).</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={currencyForm.control} name="usdToInr" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Manual Exchange Rate</FormLabel>
+                    <FormLabel className="text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Fallback Exchange Rate</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">₹</span>
                         <Input type="number" step="0.01" className="pl-7 h-10 rounded-xl" {...field} data-testid="input-exchange-rate" />
                       </div>
                     </FormControl>
-                    <FormDescription className="text-xs">Update manually based on current market rates.</FormDescription>
+                    <FormDescription className="text-xs">Used only when the live rate can't be fetched. New entries always use the live rate.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -663,7 +678,7 @@ export default function Settings() {
                     data-testid="button-save-currency"
                     className="flex-1 h-10 rounded-xl text-xs font-semibold"
                     style={{ fontFamily: "'Manrope', sans-serif", background: "hsl(38,92%,50%)", color: "hsl(228,25%,9%)" }}>
-                    Update Rate
+                    Save
                   </motion.button>
                 </div>
               </form>

@@ -49,6 +49,10 @@ export const currencySettings = pgTable("currency_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id"),           // nullable for backward compat
   usdToInr: real("usd_to_inr").notNull().default(84.0),
+  // Upwork converts at the market rate minus a spread. Measured at 2.2% against
+  // the app's live rate source from two real withdrawals (2 Oct 2026: 94.0664,
+  // 30 Oct 2026: 93.0304).
+  upworkMarginPercent: real("upwork_margin_percent").notNull().default(2.2),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -128,6 +132,9 @@ export const insertCurrencySettingsSchema = createInsertSchema(currencySettings)
   id: true,
   userId: true,
   updatedAt: true,
+}).extend({
+  usdToInr: z.number().positive().optional(),
+  upworkMarginPercent: z.number().min(0).max(10).optional(),
 });
 
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
