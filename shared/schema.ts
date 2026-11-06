@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, real, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, timestamp, integer, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -20,6 +20,10 @@ export const users = pgTable("users", {
   planType: text("plan_type").notNull().default("free"),
   planExpiresAt: timestamp("plan_expires_at"),
   razorpaySubId: text("razorpay_sub_id"),
+  // Upwork auto-sync: SHA-256 of the user's sync key (the key itself is never stored)
+  syncTokenHash: text("sync_token_hash").unique(),
+  syncTokenCreatedAt: timestamp("sync_token_created_at"),
+  lastSyncAt: timestamp("last_sync_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -30,6 +34,7 @@ export const projects = pgTable("projects", {
   rate: real("rate").notNull(),
   color: text("color").notNull(),
   type: text("type").notNull().default("hourly"), // "hourly" or "fixed"
+  upworkContractId: text("upwork_contract_id"),   // set when the project mirrors an Upwork contract
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -77,8 +82,10 @@ export const timeEntries = pgTable("time_entries", {
   netInr: real("net_inr").notNull(),
   exchangeRate: real("exchange_rate").notNull(),
 
+  // "upwork:<contractId>:<YYYY-MM-DD>" for entries created by the Upwork sync
+  externalId: text("external_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("time_entries_user_external_idx").on(t.userId, t.externalId)]);
 
 export const withdrawals = pgTable("Withdrawl", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -89,8 +96,10 @@ export const withdrawals = pgTable("Withdrawl", {
   withdrawalDate: timestamp("withdrawal_date").notNull(),
   paymentStatus: text("payment_status").notNull().default("pending"),
   notes: text("notes"),
+  // "upwork:<recordId>" for withdrawals created or matched by the Upwork sync
+  externalId: text("external_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("withdrawals_user_external_idx").on(t.userId, t.externalId)]);
 
 export const tdsEntries = pgTable("tds_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -119,6 +128,7 @@ export const webhookEvents = pgTable("webhook_events", {
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   userId: true,
+  upworkContractId: true,
   createdAt: true,
 });
 
@@ -151,6 +161,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   netUsd: true,
   netInr: true,
   exchangeRate: true,
+  externalId: true,
   createdAt: true,
 }).extend({
   minutes: z.number().int().min(0).optional(),
@@ -171,12 +182,16 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  syncTokenHash: true,
+  syncTokenCreatedAt: true,
+  lastSyncAt: true,
   createdAt: true,
 });
 
 export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   id: true,
   userId: true,
+  externalId: true,
   createdAt: true,
 }).extend({
   withdrawalDate: z.coerce.date({ required_error: "Withdrawal date is required" }),

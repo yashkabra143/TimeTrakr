@@ -4,6 +4,8 @@ import { storage } from "./storage.js";
 import { getLiveUsdInr, refreshUserCurrency } from "./exchange-rate.js";
 import { parseCsvDate, detectDayFirst, isFutureDate } from "./csv-date.js";
 import { registerSubscriptionRoutes } from "./subscription-routes.js";
+import { upworkSyncSchema } from "./upwork-sync-plan.js";
+import { createSyncKey, revokeSyncKey, getSyncStatus, userIdForSyncKey, runUpworkSync } from "./upwork-sync.js";
 import {
   insertProjectSchema,
   insertDeductionSchema,
@@ -50,6 +52,15 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many requests. Please slow down." },
+});
+
+// Upwork sync endpoint (called by the scheduled agent with a sync key).
+const syncLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many sync requests. Please try again later." },
 });
 
 // ── Validation helpers ────────────────────────────────────────────────────
@@ -921,6 +932,56 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
     } catch (error) {
       console.error("[ENTRIES IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
+    }
+  });
+
+  // ── Upwork auto-sync ──────────────────────────────────────────────────────
+  // Settings: create / view / revoke the sync key used by the weekly agent.
+  app.get("/api/sync/key", requireAuth, async (req, res) => {
+    try {
+      res.json(await getSyncStatus(req.session.userId!));
+    } catch (error) {
+      console.error("[SYNC KEY GET] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/sync/key", requireAuth, async (req, res) => {
+    try {
+      const key = await createSyncKey(req.session.userId!);
+      res.status(201).json({ key });
+    } catch (error) {
+      console.error("[SYNC KEY POST] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/sync/key", requireAuth, async (req, res) => {
+    try {
+      await revokeSyncKey(req.session.userId!);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[SYNC KEY DELETE] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // The agent posts what it read from Upwork. Auth: "Authorization: Bearer <sync key>".
+  app.post("/api/sync/upwork", syncLimiter, async (req, res) => {
+    try {
+      const header = req.headers.authorization ?? "";
+      const key = header.startsWith("Bearer ") ? header.slice(7).trim() : undefined;
+      const userId = await userIdForSyncKey(key);
+      if (!userId) return res.status(401).json({ message: "Invalid or revoked sync key" });
+
+      const parsed = upworkSyncSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid sync data", errors: parsed.error.errors.slice(0, 10) });
+      }
+      res.json(await runUpworkSync(userId, parsed.data));
+    } catch (error) {
+      console.error("[SYNC UPWORK] Error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

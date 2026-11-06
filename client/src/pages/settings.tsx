@@ -11,6 +11,7 @@ import { useProjects, useDeductions, useCurrencySettings, useUpdateProject, useU
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { UpworkSyncKey } from "@/components/upwork-sync-key";
 import { motion } from "framer-motion";
 import { EASE_OUT_EXPO } from "@/lib/animations";
 import { Save, Download, Plus, RefreshCw, Clock, Briefcase, Pencil, Trash2, Settings as SettingsIcon, Bell } from "lucide-react";
@@ -704,6 +705,13 @@ export default function Settings() {
               <Download className="w-3.5 h-3.5" /> Export Data
             </motion.button>
           </SectionCard>
+          <div className="mt-6">
+            <SectionCard
+              title="Upwork Auto-Sync"
+              description="A weekly agent adds your Upwork hours and withdrawals using this key. The key can only send sync data; it can't log in or read anything.">
+              <UpworkSyncKey />
+            </SectionCard>
+          </div>
         </motion.div>
       )}
 
