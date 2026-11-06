@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { getLiveUsdInr, refreshUserCurrency } from "./exchange-rate.js";
+import { parseCsvDate, detectDayFirst, isFutureDate } from "./csv-date.js";
 import { registerSubscriptionRoutes } from "./subscription-routes.js";
 import {
   insertProjectSchema,
@@ -23,6 +24,12 @@ const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_N
 
 // Max data rows accepted in a single CSV import (DoS guard).
 const MAX_CSV_ROWS = 5000;
+
+// Calendar day in India for a stored timestamp. Entries are saved either at
+// 00:00 UTC or at IST midnight (18:30 UTC the day before); both map to the same day.
+function istDay(d: Date): string {
+  return new Date(d.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+}
 
 // ── Rate limiters ───────────────────────────────────────────────────────────
 // NOTE: the default store is in-memory (per-instance). On serverless this
@@ -98,45 +105,6 @@ function parseCsv(text: string): string[][] {
 // ISO is anchored to local midnight to avoid UTC day-shift.
 // For slash/dash ambiguity (e.g. 2/3/2026): if first number > 12 it must be day,
 // otherwise defaults to M/D/YYYY (US, matches the template).
-function parseCsvDate(str: string): Date | null {
-  const s = (str || "").trim();
-  if (!s) return null;
-
-  // ISO yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(s + "T00:00:00");
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Slash-separated: M/D/YYYY or D/M/YYYY
-  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slashMatch) {
-    const a = Number(slashMatch[1]);
-    const b = Number(slashMatch[2]);
-    const rawYear = Number(slashMatch[3]);
-    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
-    const [month, day] = a > 12 ? [b, a] : [a, b]; // D/M if a>12, else M/D
-    const d = new Date(year, month - 1, day);
-    return isNaN(d.getTime()) || d.getMonth() !== month - 1 ? null : d;
-  }
-
-  // Non-ISO dash: D-M-YYYY or M-D-YYYY
-  const dashMatch = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
-  if (dashMatch) {
-    const a = Number(dashMatch[1]);
-    const b = Number(dashMatch[2]);
-    const rawYear = Number(dashMatch[3]);
-    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
-    const [month, day] = a > 12 ? [b, a] : [a, b];
-    const d = new Date(year, month - 1, day);
-    return isNaN(d.getTime()) || d.getMonth() !== month - 1 ? null : d;
-  }
-
-  // Natural language / Upwork "Jun 19, 2026"
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 // ── Auth middleware ───────────────────────────────────────────────────────
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -824,16 +792,32 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
       const headers = records[0].map(h => h.toLowerCase().replace(/"/g, "").trim());
       const isUpwork = headers.includes("transaction id") || headers.includes("transaction type") || headers.includes("amount $");
 
-      const [projects, deductions, currency] = await Promise.all([
+      const [projects, deductions, currency, existingEntries] = await Promise.all([
         storage.getProjects(userId),
         storage.getDeductions(userId),
         refreshUserCurrency(userId),
+        storage.getTimeEntries(userId),
       ]);
 
       const exchangeRate = Number(currency.usdToInr) || 0;
       const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
       let skipped = 0;
+      let duplicates = 0;
+
+      const dateCol = headers.indexOf("date");
+      const dayFirst = detectDayFirst(records.slice(1).map(r => r[dateCol] ?? ""));
+      // Skip rows already in TimeTrakr (same day, project, time and amount), so
+      // importing the same file twice doesn't count earnings twice.
+      const entryKey = (date: Date, projectId: string, minutes: number, grossUsd: number) =>
+        `${istDay(date)}|${projectId}|${minutes}|${grossUsd.toFixed(2)}`;
+      const seen = new Set(existingEntries.map(e => entryKey(new Date(e.date), e.projectId, e.minutes, Number(e.grossUsd))));
+      const checkDate = (raw: string, rowNum: number): Date | null => {
+        const d = parseCsvDate(raw, dayFirst);
+        if (!d) { failed.push({ row: rowNum, reason: `Invalid date: "${raw}"` }); return null; }
+        if (isFutureDate(d)) { failed.push({ row: rowNum, reason: `Date is in the future: "${raw}"` }); return null; }
+        return d;
+      };
 
       const EARNINGS_TYPES = [
         "hourly", "fixed-price", "fixed price", "bonus", "manual time",
@@ -853,11 +837,13 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           const amtVal = parseFloat(amtRaw.replace(/[^0-9.\-]/g, ""));
 
           if (isNaN(amtVal) || amtVal <= 0) { skipped++; continue; }
-          const isEarning = EARNINGS_TYPES.some(t => txType.includes(t)) || amtVal > 0;
+          // Only known earning types count. Other positive rows (refunds,
+          // adjustments, unknown types) are skipped rather than guessed.
+          const isEarning = EARNINGS_TYPES.some(t => txType.includes(t));
           if (!isEarning) { skipped++; continue; }
 
-          const dateVal = parseCsvDate(row["date"]);
-          if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
+          const dateVal = checkDate(row["date"], i);
+          if (!dateVal) continue;
 
           const descParts = [row["transaction summary"], row["transaction summary details"], row["description 1"], row["description 2"], row["description 3"]].filter(Boolean);
           const description = descParts.join(" · ").slice(0, 500) || null;
@@ -869,6 +855,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           if (!project) { failed.push({ row: i, reason: "No projects found — create one first" }); continue; }
 
           const grossUsd = amtVal;
+          const key = entryKey(dateVal, project.id, 0, grossUsd);
+          if (seen.has(key)) { duplicates++; continue; }
+          seen.add(key);
           const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
           const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
           const gst = svc * ((Number(deductions.gst) || 0) / 100);
@@ -887,8 +876,8 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           } catch { failed.push({ row: i, reason: "Failed to save entry" }); }
 
         } else {
-          const dateVal = parseCsvDate(row["date"]);
-          if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row["date"]}"` }); continue; }
+          const dateVal = checkDate(row["date"], i);
+          if (!dateVal) continue;
 
           const hoursVal = parseFloat(row["hours"]);
           if (isNaN(hoursVal) || hoursVal <= 0) { failed.push({ row: i, reason: `Invalid hours: "${row["hours"]}"` }); continue; }
@@ -906,6 +895,9 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
           const minutes = Math.round(hoursVal * 60);
           const rate = Number(project.rate);
           const grossUsd = hoursVal * rate;
+          const key = entryKey(dateVal, project.id, minutes, grossUsd);
+          if (seen.has(key)) { duplicates++; continue; }
+          seen.add(key);
           const svc = grossUsd * ((Number(deductions.serviceFee) || 0) / 100);
           const tds = grossUsd * ((Number(deductions.tds) || 0) / 100);
           const gst = svc * ((Number(deductions.gst) || 0) / 100);
@@ -925,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      res.json({ imported: imported.length, failed, skipped, total: records.length - 1 });
+      res.json({ imported: imported.length, failed, skipped, duplicates, total: records.length - 1 });
     } catch (error) {
       console.error("[ENTRIES IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });
@@ -1166,6 +1158,10 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
 
       const imported: string[] = [];
       const failed: { row: number; reason: string }[] = [];
+      let duplicates = 0;
+      const dayFirst = detectDayFirst(records.slice(1).map(r => r[headers.indexOf("date")] ?? ""));
+      const wKey = (d: Date, amount: number) => `${istDay(d)}|${amount.toFixed(2)}`;
+      const seen = new Set((await storage.getWithdrawals(userId)).map(w => wKey(new Date(w.withdrawalDate), Number(w.netEarnings))));
 
       for (let i = 1; i < records.length; i++) {
         const values = records[i];
@@ -1174,11 +1170,15 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         const row: Record<string, string> = {};
         headers.forEach((h, idx) => { row[h] = (values[idx] ?? "").trim(); });
 
-        const dateVal = parseCsvDate(row.date);
+        const dateVal = parseCsvDate(row.date, dayFirst);
         if (!dateVal) { failed.push({ row: i, reason: `Invalid date: "${row.date}"` }); continue; }
+        if (isFutureDate(dateVal)) { failed.push({ row: i, reason: `Date is in the future: "${row.date}"` }); continue; }
 
         const amount = parseFloat(row.amount);
         if (isNaN(amount) || amount <= 0) { failed.push({ row: i, reason: `Invalid amount: "${row.amount}"` }); continue; }
+        const key = wKey(dateVal, amount);
+        if (seen.has(key)) { duplicates++; continue; }
+        seen.add(key);
 
         const transactionFee = 0.99;
         const withdrawalAmount = Math.max(0, amount - transactionFee);
@@ -1195,7 +1195,7 @@ export async function registerRoutes(app: Express): Promise<Server | null> {
         }
       }
 
-      res.json({ imported: imported.length, failed, total: records.length - 1 });
+      res.json({ imported: imported.length, failed, duplicates, total: records.length - 1 });
     } catch (error) {
       console.error("[WITHDRAWALS IMPORT] Error:", error);
       res.status(500).json({ message: "Import failed" });

@@ -9,7 +9,7 @@ import type { ImportResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
-type ImportResultEx = ImportResult & { skipped?: number };
+type ImportResultEx = ImportResult & { skipped?: number; duplicates?: number };
 
 // ── Template CSV strings ───────────────────────────────────────────────────
 const ENTRY_TEMPLATE = `date,project,hours,description
@@ -78,6 +78,12 @@ function ImportSummary({ result, onReset }: { result: ImportResultEx; onReset: (
       {result.skipped ? (
         <p className="text-xs text-muted-foreground text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
           Skipped rows = service fees, withdrawals & non-earning transactions (expected for Upwork reports)
+        </p>
+      ) : null}
+
+      {result.duplicates ? (
+        <p className="text-xs text-muted-foreground text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          {result.duplicates} row{result.duplicates !== 1 ? "s were" : " was"} already in TimeTrakr and skipped, so nothing was counted twice.
         </p>
       ) : null}
 

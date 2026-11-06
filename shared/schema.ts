@@ -35,7 +35,7 @@ export const projects = pgTable("projects", {
 
 export const deductions = pgTable("deductions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id"),           // nullable for backward compat
+  userId: varchar("user_id").unique(),  // one settings row per user
   serviceFee: real("service_fee").notNull().default(10),
   tds: real("tds").notNull().default(0.1),
   gst: real("gst").notNull().default(18),
@@ -47,7 +47,7 @@ export const deductions = pgTable("deductions", {
 
 export const currencySettings = pgTable("currency_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id"),           // nullable for backward compat
+  userId: varchar("user_id").unique(),  // one settings row per user
   usdToInr: real("usd_to_inr").notNull().default(84.0),
   // Upwork converts at the market rate minus a spread. Measured at 2.2% against
   // the app's live rate source from two real withdrawals (2 Oct 2026: 94.0664,

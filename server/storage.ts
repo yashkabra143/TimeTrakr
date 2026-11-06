@@ -138,18 +138,20 @@ export class DatabaseStorage implements IStorage {
   // ── Deductions (auto-create defaults per user) ────────────────────────────
 
   async getDeductions(userId: string): Promise<Deduction> {
-    const [existing] = await db
-      .select()
-      .from(deductions)
+    const select = () => db.select().from(deductions)
       .where(eq(deductions.userId, userId))
+      .orderBy(desc(deductions.updatedAt))
       .limit(1);
+    const [existing] = await select();
     if (existing) return existing;
-    // Auto-create defaults for new user
+    // Auto-create defaults. user_id is unique, so two parallel first requests
+    // can't create two rows: the loser's insert is ignored and it re-reads.
     const [created] = await db
       .insert(deductions)
       .values({ userId, serviceFee: 10, tds: 0.1, gst: 18, transferFee: 0.99 })
+      .onConflictDoNothing()
       .returning();
-    return created;
+    return created ?? (await select())[0];
   }
 
   async updateDeductions(userId: string, updateData: Partial<InsertDeduction>): Promise<Deduction> {
@@ -165,18 +167,19 @@ export class DatabaseStorage implements IStorage {
   // ── Currency Settings (auto-create defaults per user) ─────────────────────
 
   async getCurrencySettings(userId: string): Promise<CurrencySetting> {
-    const [existing] = await db
-      .select()
-      .from(currencySettings)
+    const select = () => db.select().from(currencySettings)
       .where(eq(currencySettings.userId, userId))
+      .orderBy(desc(currencySettings.updatedAt))
       .limit(1);
+    const [existing] = await select();
     if (existing) return existing;
-    // Auto-create defaults for new user
+    // Auto-create defaults (see getDeductions for why onConflictDoNothing).
     const [created] = await db
       .insert(currencySettings)
       .values({ userId, usdToInr: 84.0 })
+      .onConflictDoNothing()
       .returning();
-    return created;
+    return created ?? (await select())[0];
   }
 
   async updateCurrencySettings(userId: string, updateData: Partial<InsertCurrencySetting>): Promise<CurrencySetting> {
